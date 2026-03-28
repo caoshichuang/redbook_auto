@@ -31,6 +31,10 @@ ENV/
 *.swp
 *.swo
 
+# OpenCode & OpenSpec (开发工具配置，不需要提交)
+.opencode/
+openspec/
+
 # Environment Variables
 .env
 
