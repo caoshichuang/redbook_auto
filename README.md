@@ -279,6 +279,19 @@ cleanup_expired_users()
    git push
    ```
 
+4. **部署脚本自动执行**（scripts/deploy.sh）：
+   - 备份敏感文件（`.env`、`holidays.json`、`db.sqlite3`）
+   - 从 GitHub 拉取最新代码（带重试机制）
+   - 恢复敏感文件
+   - 构建前端（`npm run build`）
+   - 重启服务（`nohup` 方式）
+
+**注意**：国内服务器访问 GitHub 可能超时，部署脚本已配置以下优化：
+- 使用 HTTP/1.1 协议
+- 设置低速限制和超时时间
+- 最多重试 3 次
+- 使用 `--depth=1` 浅克隆
+
 ### 方式2：手动部署
 
 1. **服务器配置**

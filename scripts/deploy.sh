@@ -20,7 +20,24 @@ cp $PROJECT_DIR/data/db.sqlite3 $BACKUP_DIR/db.sqlite3 2>/dev/null || true
 # 2. 拉取最新代码
 echo "[2/5] 拉取最新代码..."
 cd $PROJECT_DIR
-git fetch origin main
+
+# 优化 git 配置，避免超时
+git config --global http.version HTTP/1.1
+git config --global http.lowSpeedLimit 0
+git config --global http.lowSpeedTime 999999
+
+# 尝试拉取代码，最多重试 3 次
+for i in {1..3}; do
+  echo "尝试第 $i 次拉取..."
+  if git fetch origin main --depth=1; then
+    echo "拉取成功！"
+    break
+  else
+    echo "拉取失败，等待 5 秒后重试..."
+    sleep 5
+  fi
+done
+
 git reset --hard origin/main
 
 # 3. 恢复敏感文件
