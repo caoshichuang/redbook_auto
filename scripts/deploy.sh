@@ -15,6 +15,8 @@ cd $PROJECT_DIR
 
 # 1. 拉取最新代码
 echo "[1/5] 拉取最新代码..."
+git remote set-url origin https://github.com/caoshichuang/FinanceSail.git
+git stash || true
 git fetch origin main
 git reset --hard origin/main
 
