@@ -16,7 +16,7 @@ echo "[1/2] 重启服务..."
 pkill -f "src.main" || true
 sleep 1
 export PATH=$PATH:/home/admin/.local/bin
-screen -dmS redbook bash -c 'export PATH=$PATH:/home/admin/.local/bin && cd /home/admin/redbook-auto && python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8080'
+nohup python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8080 > /tmp/redbook-auto.log 2>&1 &
 
 # 2. 检查服务状态
 echo "[2/2] 检查服务状态..."
