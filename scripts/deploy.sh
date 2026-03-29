@@ -15,7 +15,11 @@ cd $PROJECT_DIR
 
 # 1. 拉取最新代码
 echo "[1/5] 拉取最新代码..."
+# 配置 Git 使用 HTTP/1.1 避免 HTTP2 问题
 git config --global http.version HTTP/1.1
+# 禁用 SSH host key 检查（使用 HTTPS 时不需要）
+export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no"
+# 强制使用 HTTPS
 git remote set-url origin https://github.com/caoshichuang/FinanceSail.git
 git stash || true
 git fetch origin main
