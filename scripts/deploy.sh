@@ -21,8 +21,8 @@ screen -dmS redbook bash -c 'export PATH=$PATH:/home/admin/.local/bin && cd /hom
 # 2. 检查服务状态
 echo "[2/2] 检查服务状态..."
 sleep 5
-ps aux | grep "src.main" | grep -v grep || echo "服务启动中..."
-curl -s http://localhost:8080/api/health || echo "服务启动中..."
+ps aux | grep "src.main" | grep -v grep || true
+curl -s http://localhost:8080/api/health || true
 
 echo "========================================="
 echo "FinanceSail 部署完成！"
