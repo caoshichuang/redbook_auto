@@ -1,0 +1,47 @@
+{
+  "star_stocks": {
+    "A股": [
+      {"code": "600519", "name": "贵州茅台"},
+      {"code": "300750", "name": "宁德时代"},
+      {"code": "002594", "name": "比亚迪"},
+      {"code": "601318", "name": "中国平安"},
+      {"code": "000858", "name": "五粮液"},
+      {"code": "600036", "name": "招商银行"},
+      {"code": "000333", "name": "美的集团"},
+      {"code": "601888", "name": "中国中免"}
+    ],
+    "港股": [
+      {"code": "00700", "name": "腾讯控股"},
+      {"code": "09988", "name": "阿里巴巴"},
+      {"code": "03690", "name": "美团"},
+      {"code": "01810", "name": "小米集团"},
+      {"code": "09618", "name": "京东集团"},
+      {"code": "09888", "name": "百度集团"}
+    ],
+    "美股": [
+      {"code": "AAPL", "name": "苹果"},
+      {"code": "MSFT", "name": "微软"},
+      {"code": "NVDA", "name": "英伟达"},
+      {"code": "TSLA", "name": "特斯拉"},
+      {"code": "GOOGL", "name": "谷歌"},
+      {"code": "AMZN", "name": "亚马逊"},
+      {"code": "META", "name": "Meta"}
+    ]
+  },
+  "thresholds": {
+    "hot_stock_threshold": 3.0,
+    "limit_up_down_threshold": 9.9
+  },
+  "scheduler": {
+    "us_stock_time": "09:00",
+    "a_share_time": "17:00",
+    "hot_stock_time": "17:30",
+    "ipo_time": "20:00"
+  },
+  "distribution": {
+    "wechat_app_id": "",
+    "wechat_app_secret": "",
+    "toutiao_access_token": "",
+    "wxpusher_app_token": ""
+  }
+}
