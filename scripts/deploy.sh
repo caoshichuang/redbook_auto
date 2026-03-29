@@ -15,6 +15,7 @@ cd $PROJECT_DIR
 
 # 1. 拉取最新代码
 echo "[1/5] 拉取最新代码..."
+git config --global http.version HTTP/1.1
 git remote set-url origin https://github.com/caoshichuang/FinanceSail.git
 git stash || true
 git fetch origin main
