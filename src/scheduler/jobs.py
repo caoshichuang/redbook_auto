@@ -425,40 +425,57 @@ async def ipo_job():
 
 
 def setup_scheduler() -> AsyncIOScheduler:
-    """设置定时任务"""
+    """设置定时任务（使用动态配置）"""
     # 初始化数据库
     init_db()
 
+    # 重新加载动态配置
+    settings.load_dynamic_config()
+
     scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
 
-    # 美股总结：每日09:00
+    # 解析动态配置的时间
+    def parse_time(time_str: str) -> tuple:
+        """解析时间字符串，返回 (hour, minute)"""
+        try:
+            parts = time_str.split(":")
+            return int(parts[0]), int(parts[1])
+        except:
+            # 默认值
+            return 9, 0
+
+    # 美股总结
+    us_hour, us_minute = parse_time(settings.US_STOCK_TIME)
     scheduler.add_job(
         us_stock_job,
-        CronTrigger(hour=9, minute=0),
+        CronTrigger(hour=us_hour, minute=us_minute),
         id="us_stock_summary",
         name="美股总结",
     )
 
-    # A股+港股总结：每日17:00
+    # A股+港股总结
+    a_hour, a_minute = parse_time(settings.A_SHARE_TIME)
     scheduler.add_job(
         a_share_job,
-        CronTrigger(hour=17, minute=0),
+        CronTrigger(hour=a_hour, minute=a_minute),
         id="a_share_summary",
         name="A股港股总结",
     )
 
-    # 热点个股：每日17:30（A股收盘后）
+    # 热点个股
+    hot_hour, hot_minute = parse_time(settings.HOT_STOCK_TIME)
     scheduler.add_job(
         hot_stock_job,
-        CronTrigger(hour=17, minute=30),
+        CronTrigger(hour=hot_hour, minute=hot_minute),
         id="hot_stock",
         name="热点个股",
     )
 
-    # IPO分析：每日20:00（晚间发布明日IPO）
+    # IPO分析
+    ipo_hour, ipo_minute = parse_time(settings.IPO_TIME)
     scheduler.add_job(
         ipo_job,
-        CronTrigger(hour=20, minute=0),
+        CronTrigger(hour=ipo_hour, minute=ipo_minute),
         id="ipo_analysis",
         name="IPO分析",
     )

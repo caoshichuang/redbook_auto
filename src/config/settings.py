@@ -3,8 +3,9 @@
 使用Pydantic管理所有配置项
 """
 
+import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
@@ -48,7 +49,7 @@ class Settings(BaseSettings):
     LOG_ROTATION: str = Field(default="10 MB", description="日志轮转大小")
     LOG_RETENTION: str = Field(default="30 days", description="日志保留时间")
 
-    # 明星股列表
+    # 明星股列表（默认值，会被动态配置覆盖）
     A_SHARE_STAR_STOCKS: list = Field(
         default=[
             {"code": "600519", "name": "贵州茅台"},
@@ -92,6 +93,12 @@ class Settings(BaseSettings):
     HOT_STOCK_THRESHOLD: float = Field(default=3.0, description="热点股票涨跌阈值（%）")
     LIMIT_UP_DOWN_THRESHOLD: float = Field(default=9.9, description="涨跌停阈值（%）")
 
+    # 定时任务时间
+    US_STOCK_TIME: str = Field(default="09:00", description="美股总结时间")
+    A_SHARE_TIME: str = Field(default="17:00", description="A股港股总结时间")
+    HOT_STOCK_TIME: str = Field(default="17:30", description="热点个股时间")
+    IPO_TIME: str = Field(default="20:00", description="IPO分析时间")
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
@@ -103,7 +110,53 @@ class Settings(BaseSettings):
         self.IMAGE_DIR.mkdir(parents=True, exist_ok=True)
         self.LOG_DIR.mkdir(parents=True, exist_ok=True)
 
+    def _load_dynamic_config(self) -> Dict[str, Any]:
+        """加载动态配置文件"""
+        dynamic_config_path = self.PROJECT_ROOT / "config" / "dynamic_config.json"
+        try:
+            if dynamic_config_path.exists():
+                with open(dynamic_config_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"加载动态配置失败: {e}")
+        return {}
+
+    def load_dynamic_config(self):
+        """加载动态配置并更新设置"""
+        dynamic_config = self._load_dynamic_config()
+
+        # 更新明星股配置
+        if "star_stocks" in dynamic_config:
+            star_stocks = dynamic_config["star_stocks"]
+            if "A股" in star_stocks:
+                self.A_SHARE_STAR_STOCKS = star_stocks["A股"]
+            if "港股" in star_stocks:
+                self.HK_STAR_STOCKS = star_stocks["港股"]
+            if "美股" in star_stocks:
+                self.US_STAR_STOCKS = star_stocks["美股"]
+
+        # 更新阈值配置
+        if "thresholds" in dynamic_config:
+            thresholds = dynamic_config["thresholds"]
+            if "hot_stock_threshold" in thresholds:
+                self.HOT_STOCK_THRESHOLD = thresholds["hot_stock_threshold"]
+            if "limit_up_down_threshold" in thresholds:
+                self.LIMIT_UP_DOWN_THRESHOLD = thresholds["limit_up_down_threshold"]
+
+        # 更新定时任务时间
+        if "scheduler" in dynamic_config:
+            scheduler = dynamic_config["scheduler"]
+            if "us_stock_time" in scheduler:
+                self.US_STOCK_TIME = scheduler["us_stock_time"]
+            if "a_share_time" in scheduler:
+                self.A_SHARE_TIME = scheduler["a_share_time"]
+            if "hot_stock_time" in scheduler:
+                self.HOT_STOCK_TIME = scheduler["hot_stock_time"]
+            if "ipo_time" in scheduler:
+                self.IPO_TIME = scheduler["ipo_time"]
+
 
 # 全局配置实例
 settings = Settings()
 settings.ensure_dirs()
+settings.load_dynamic_config()
