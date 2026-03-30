@@ -92,6 +92,7 @@ async def get_scheduled_jobs(current_user: str = Depends(get_current_user)):
     """获取定时任务状态"""
     try:
         scheduler = setup_scheduler()
+        scheduler.start()
         jobs = scheduler.get_jobs()
 
         result = []
@@ -110,7 +111,8 @@ async def get_scheduled_jobs(current_user: str = Depends(get_current_user)):
         return result
     except Exception as e:
         logger.error(f"获取定时任务状态失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # 返回空列表而不是抛出异常
+        return []
 
 
 async def _read_log_file(log_file: Path, lines: int) -> LogResponse:
