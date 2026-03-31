@@ -21,10 +21,9 @@ cp $PROJECT_DIR/data/db.sqlite3 $BACKUP_DIR/db.sqlite3 2>/dev/null || true
 echo "[2/5] 拉取最新代码..."
 cd $PROJECT_DIR
 
-# 优化 git 配置，避免超时
-git config --global http.version HTTP/1.1
-git config --global http.lowSpeedLimit 1000
-git config --global http.lowSpeedTime 60
+# 切换到 SSH 地址（避免 HTTPS 超时）
+echo "切换到 SSH 地址..."
+git remote set-url origin git@github.com:caoshichuang/FinanceSail.git
 
 # 尝试拉取代码，最多重试 5 次
 SUCCESS=0
