@@ -18,7 +18,7 @@ from ..generators.hot_stock import HotStockGenerator
 from ..renderers.cover import CoverRenderer
 from ..renderers.cards import CardsRenderer
 from ..renderers.packer import ImagePacker
-from ..notifiers.email import EmailNotifier
+from ..notification_sender.email_sender import EmailSender
 from ..models.db import init_db, Content, get_session
 from ..config.settings import settings
 from ..config.constants import MarketType, ContentStatus, ContentType
@@ -113,23 +113,16 @@ async def us_stock_job():
         )
 
         # 5. 发送邮件
-        notifier = EmailNotifier()
-        notifier.send(
-            market=MarketType.US_STOCK,
-            titles=content["titles"],
-            content=content["content"],
-            tags=content["tags"],
-            attachments=[cover_path],  # 只发送封面图片，不发送zip
-            date=data.get("date", ""),
-            content_id=content_id,
-            cover_image=cover_path,
-        )
+        notifier = EmailSender()
+        subject = f"【FinanceSail】美股市场报告 {data.get('date', '')}"
+        body = f"# {content['titles'][0]}\n\n{content['content']}\n\n标签：{content['tags']}"
+        notifier.send(body, subject=subject, attachments=[cover_path])
 
         logger.info(f"{job_name}任务完成")
 
     except Exception as e:
         logger.error(f"{job_name}任务失败: {e}")
-        notifier = EmailNotifier()
+        notifier = EmailSender()
         notifier.send_error(str(e), job_name)
 
 
@@ -201,23 +194,16 @@ async def a_share_job():
         )
 
         # 7. 发送邮件
-        notifier = EmailNotifier()
-        notifier.send(
-            market=MarketType.A_SHARE,
-            titles=a_share_content["titles"],
-            content=a_share_content["content"],
-            tags=a_share_content["tags"],
-            attachments=[cover_path],  # 只发送封面图片，不发送zip
-            date=a_share_data.get("date", ""),
-            content_id=content_id,
-            cover_image=cover_path,
-        )
+        notifier = EmailSender()
+        subject = f"【FinanceSail】A股港股市场报告 {a_share_data.get('date', '')}"
+        body = f"# {a_share_content['titles'][0]}\n\n{a_share_content['content']}\n\n标签：{a_share_content['tags']}"
+        notifier.send(body, subject=subject, attachments=[cover_path])
 
         logger.info(f"{job_name}任务完成")
 
     except Exception as e:
         logger.error(f"{job_name}任务失败: {e}")
-        notifier = EmailNotifier()
+        notifier = EmailSender()
         notifier.send_error(str(e), job_name)
 
 
@@ -331,23 +317,16 @@ async def hot_stock_job():
             )
 
             # 发送邮件
-            notifier = EmailNotifier()
-            notifier.send(
-                market="热点",
-                titles=content["titles"],
-                content=content["content"],
-                tags=content["tags"],
-                attachments=[cover_path],  # 只发送封面图片，不发送zip
-                date=datetime.now().strftime("%Y-%m-%d"),
-                content_id=content_id,
-                cover_image=cover_path,
-            )
+            notifier = EmailSender()
+            subject = f"【FinanceSail】热点个股分析 {content['titles'][0]}"
+            body = f"# {content['titles'][0]}\n\n{content['content']}\n\n标签：{content['tags']}"
+            notifier.send(body, subject=subject, attachments=[cover_path])
 
         logger.info(f"{job_name}任务完成")
 
     except Exception as e:
         logger.error(f"{job_name}任务失败: {e}")
-        notifier = EmailNotifier()
+        notifier = EmailSender()
         notifier.send_error(str(e), job_name)
 
 
@@ -427,23 +406,16 @@ async def ipo_job():
             )
 
             # 发送邮件
-            notifier = EmailNotifier()
-            notifier.send(
-                market="IPO",
-                titles=content["titles"],
-                content=content["content"],
-                tags=content["tags"],
-                attachments=[cover_path],  # 只发送封面图片，不发送zip
-                date=ipo.get("subscription_date", ""),
-                content_id=content_id,
-                cover_image=cover_path,
-            )
+            notifier = EmailSender()
+            subject = f"【FinanceSail】IPO分析 {content['titles'][0]}"
+            body = f"# {content['titles'][0]}\n\n{content['content']}\n\n标签：{content['tags']}"
+            notifier.send(body, subject=subject, attachments=[cover_path])
 
         logger.info(f"{job_name}任务完成")
 
     except Exception as e:
         logger.error(f"{job_name}任务失败: {e}")
-        notifier = EmailNotifier()
+        notifier = EmailSender()
         notifier.send_error(str(e), job_name)
 
 

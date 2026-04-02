@@ -460,16 +460,13 @@ async def test_config(test_type: str, current_user: str = Depends(get_current_us
     try:
         if test_type == "email":
             # 测试邮件发送
-            from ..notifiers.email import EmailNotifier
+            from ..notification_sender.email_sender import EmailSender
 
             try:
-                notifier = EmailNotifier()
+                notifier = EmailSender()
                 notifier.send(
-                    market="测试",
-                    titles=["配置测试邮件"],
-                    content="这是一封测试邮件，用于验证邮件配置是否正确。",
-                    tags=["测试", "配置"],
-                    date="",
+                    "这是一封测试邮件，用于验证邮件配置是否正确。",
+                    subject="【FinanceSail】配置测试邮件",
                 )
                 return {"success": True, "message": "测试邮件发送成功"}
             except Exception as e:
