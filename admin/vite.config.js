@@ -23,7 +23,8 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['vue', 'vue-router', 'pinia'],
-          element: ['element-plus', '@element-plus/icons-vue']
+          tabler: ['@tabler/core'],
+          i18n: ['vue-i18n']
         }
       }
     }
