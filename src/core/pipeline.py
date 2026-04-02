@@ -190,7 +190,49 @@ class StockAnalysisPipeline:
         # 策略 Prompt 注入
         if self._strategy_manager:
             try:
-                strategy_prompt = self._strategy_manager.build_combined_prompt()
+                # 读取当前市场的启用策略配置（无配置时全部启用）
+                market = (extra_context or {}).get("market", None)
+                enabled_ids: list = []
+                if market:
+                    try:
+                        import json
+                        from pathlib import Path
+                        from src.config.settings import settings
+
+                        dynamic_cfg_file = (
+                            settings.PROJECT_ROOT / "config" / "dynamic_config.json"
+                        )
+                        if dynamic_cfg_file.exists():
+                            with open(dynamic_cfg_file, "r", encoding="utf-8") as f:
+                                dyn = json.load(f)
+                            key = f"strategy.{market}.enabled"
+                            raw = dyn.get("strategies", {}).get(key, None)
+                            if raw is not None:
+                                enabled_ids = (
+                                    raw if isinstance(raw, list) else json.loads(raw)
+                                )
+                    except Exception as _e:
+                        logger.debug(f"读取市场策略配置失败，使用默认全部策略: {_e}")
+
+                if enabled_ids:
+                    # 临时激活指定策略集
+                    original_active = list(self._strategy_manager._active)
+                    for sid in enabled_ids:
+                        if sid in self._strategy_manager._strategies:
+                            if sid not in self._strategy_manager._active:
+                                self._strategy_manager._active.append(sid)
+                    # 只保留 enabled_ids 中的策略
+                    self._strategy_manager._active = [
+                        sid
+                        for sid in self._strategy_manager._active
+                        if sid in enabled_ids
+                    ]
+                    strategy_prompt = self._strategy_manager.get_combined_prompt()
+                    # 恢复原始激活状态
+                    self._strategy_manager._active = original_active
+                else:
+                    strategy_prompt = self._strategy_manager.get_combined_prompt()
+
                 if strategy_prompt:
                     context["strategy_prompt"] = strategy_prompt
             except Exception as e:

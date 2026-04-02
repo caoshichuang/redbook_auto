@@ -1,101 +1,202 @@
 <template>
-  <div class="users-page">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>用户管理</span>
-          <el-button type="primary" @click="showAddDialog">添加用户</el-button>
+  <div>
+    <div class="page-header d-print-none">
+      <div class="row align-items-center">
+        <div class="col">
+          <h2 class="page-title">{{ t('users.title') }}</h2>
         </div>
-      </template>
-      
-      <el-table :data="users" v-loading="loading">
-        <el-table-column prop="email" label="邮箱" />
-        <el-table-column prop="name" label="昵称" />
-        <el-table-column prop="expire_date" label="到期时间" />
-        <el-table-column label="状态">
-          <template #default="{ row }">
-            <el-tag :type="row.is_expired ? 'danger' : 'success'">
-              {{ row.is_expired ? '已过期' : '有效' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="订阅数">
-          <template #default="{ row }">
-            {{ row.stocks?.length || 0 }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="250">
-          <template #default="{ row }">
-            <el-button size="small" @click="showSubscriptions(row)">订阅管理</el-button>
-            <el-button size="small" type="success" @click="showRenewDialog(row)">续费</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- 添加用户对话框 -->
-    <el-dialog v-model="addDialogVisible" title="添加用户" width="400px">
-      <el-form :model="addForm" label-width="80px">
-        <el-form-item label="邮箱" required>
-          <el-input v-model="addForm.email" />
-        </el-form-item>
-        <el-form-item label="昵称">
-          <el-input v-model="addForm.name" />
-        </el-form-item>
-        <el-form-item label="到期天数">
-          <el-input-number v-model="addForm.expire_days" :min="1" :max="365" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="addDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleAdd">确定</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 续费对话框 -->
-    <el-dialog v-model="renewDialogVisible" title="续费" width="300px">
-      <el-form label-width="80px">
-        <el-form-item label="用户">
-          <span>{{ currentUser?.email }}</span>
-        </el-form-item>
-        <el-form-item label="续费天数">
-          <el-input-number v-model="renewDays" :min="1" :max="365" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="renewDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleRenew">确定</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 订阅管理对话框 -->
-    <el-dialog v-model="subDialogVisible" title="订阅管理" width="600px">
-      <div style="margin-bottom: 16px">
-        <el-input v-model="newStock" placeholder="输入股票代码或名称" style="width: 300px; margin-right: 8px" />
-        <el-button type="primary" @click="handleAddSubscription">添加订阅</el-button>
+        <div class="col-auto ms-auto">
+          <button class="btn btn-primary" @click="showAddDialog">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24"
+              stroke-width="2" stroke="currentColor" fill="none">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            {{ t('users.addUser') }}
+          </button>
+        </div>
       </div>
-      
-      <el-table :data="currentUser?.stocks || []">
-        <el-table-column prop="code" label="代码" />
-        <el-table-column prop="name" label="名称" />
-        <el-table-column label="操作">
-          <template #default="{ row }">
-            <el-button size="small" type="danger" @click="handleDeleteSubscription(row)">
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-dialog>
+    </div>
+
+    <!-- 消息提示 -->
+    <div v-if="message.text" class="alert mb-3" :class="message.type === 'success' ? 'alert-success' : 'alert-danger'" role="alert">
+      {{ message.text }}
+    </div>
+
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>{{ t('users.email') }}</th>
+              <th>{{ t('users.nickname') }}</th>
+              <th>{{ t('users.expireDate') }}</th>
+              <th>{{ t('common.status') }}</th>
+              <th>{{ t('users.subscriptions') }}</th>
+              <th>{{ t('common.actions') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loading">
+              <td colspan="6" class="text-center py-4">
+                <div class="spinner-border spinner-border-sm text-primary"></div>
+              </td>
+            </tr>
+            <tr v-else-if="users.length === 0">
+              <td colspan="6" class="text-center text-muted py-4">暂无用户</td>
+            </tr>
+            <tr v-for="user in users" :key="user.email">
+              <td>
+                <div class="d-flex align-items-center">
+                  <span class="avatar avatar-sm me-2 bg-primary-lt">{{ user.email?.charAt(0).toUpperCase() }}</span>
+                  {{ user.email }}
+                </div>
+              </td>
+              <td class="text-muted">{{ user.name || '-' }}</td>
+              <td class="text-muted">{{ user.expire_date }}</td>
+              <td>
+                <span class="badge" :class="user.is_expired ? 'bg-danger-lt text-danger' : 'bg-success-lt text-success'">
+                  {{ user.is_expired ? t('users.expired') : t('users.active') }}
+                </span>
+              </td>
+              <td class="text-muted">{{ user.stocks?.length || 0 }}</td>
+              <td>
+                <div class="btn-list flex-nowrap">
+                  <button class="btn btn-sm btn-ghost-secondary" @click="showSubscriptions(user)">
+                    {{ t('users.manageSubscriptions') }}
+                  </button>
+                  <button class="btn btn-sm btn-ghost-success" @click="showRenewDialog(user)">
+                    {{ t('users.renew') }}
+                  </button>
+                  <button class="btn btn-sm btn-ghost-danger" @click="handleDelete(user)">
+                    {{ t('common.delete') }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 添加用户 Modal -->
+    <div class="modal modal-blur fade" :class="{ show: addDialogVisible }" :style="{ display: addDialogVisible ? 'block' : 'none' }" tabindex="-1" role="dialog">
+      <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">{{ t('users.addUser') }}</h5>
+            <button type="button" class="btn-close" @click="addDialogVisible = false"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label required">{{ t('users.email') }}</label>
+              <input type="email" class="form-control" v-model="addForm.email" placeholder="user@example.com" />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">{{ t('users.nickname') }}</label>
+              <input type="text" class="form-control" v-model="addForm.name" placeholder="昵称" />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">{{ t('users.expireDays') }}</label>
+              <input type="number" class="form-control" v-model.number="addForm.expire_days" min="1" max="365" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-link link-secondary me-auto" @click="addDialogVisible = false">{{ t('common.cancel') }}</button>
+            <button type="button" class="btn btn-primary" @click="handleAdd">{{ t('common.confirm') }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="addDialogVisible" class="modal-backdrop fade show"></div>
+
+    <!-- 续费 Modal -->
+    <div class="modal modal-blur fade" :class="{ show: renewDialogVisible }" :style="{ display: renewDialogVisible ? 'block' : 'none' }" tabindex="-1" role="dialog">
+      <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">{{ t('users.renew') }}</h5>
+            <button type="button" class="btn-close" @click="renewDialogVisible = false"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">{{ t('common.email') }}</label>
+              <div class="form-control bg-light">{{ currentUser?.email }}</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">{{ t('users.renewDays') }}</label>
+              <input type="number" class="form-control" v-model.number="renewDays" min="1" max="365" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-link link-secondary me-auto" @click="renewDialogVisible = false">{{ t('common.cancel') }}</button>
+            <button type="button" class="btn btn-primary" @click="handleRenew">{{ t('common.confirm') }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="renewDialogVisible" class="modal-backdrop fade show"></div>
+
+    <!-- 订阅管理 Modal -->
+    <div class="modal modal-blur fade" :class="{ show: subDialogVisible }" :style="{ display: subDialogVisible ? 'block' : 'none' }" tabindex="-1" role="dialog">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">{{ t('users.manageSubscriptions') }} - {{ currentUser?.email }}</h5>
+            <button type="button" class="btn-close" @click="subDialogVisible = false"></button>
+          </div>
+          <div class="modal-body">
+            <div class="d-flex gap-2 mb-3">
+              <input
+                type="text"
+                class="form-control"
+                v-model="newStock"
+                :placeholder="t('users.inputStock')"
+                @keyup.enter="handleAddSubscription"
+              />
+              <button class="btn btn-primary" @click="handleAddSubscription">{{ t('users.addSubscription') }}</button>
+            </div>
+            <table class="table table-vcenter">
+              <thead>
+                <tr>
+                  <th>{{ t('users.stockCode') }}</th>
+                  <th>{{ t('users.stockName') }}</th>
+                  <th>{{ t('common.actions') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!currentUser?.stocks?.length">
+                  <td colspan="3" class="text-center text-muted py-3">暂无订阅</td>
+                </tr>
+                <tr v-for="stock in (currentUser?.stocks || [])" :key="stock.code">
+                  <td>{{ stock.code }}</td>
+                  <td>{{ stock.name }}</td>
+                  <td>
+                    <button class="btn btn-sm btn-ghost-danger" @click="handleDeleteSubscription(stock)">
+                      {{ t('common.delete') }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="subDialogVisible = false">{{ t('common.close') }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="subDialogVisible" class="modal-backdrop fade show"></div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { usersApi } from '../utils/api'
 
+const { t } = useI18n()
 const users = ref([])
 const loading = ref(false)
 const addDialogVisible = ref(false)
@@ -104,6 +205,7 @@ const subDialogVisible = ref(false)
 const currentUser = ref(null)
 const newStock = ref('')
 const renewDays = ref(30)
+const message = reactive({ text: '', type: 'success' })
 
 const addForm = reactive({
   email: '',
@@ -111,12 +213,18 @@ const addForm = reactive({
   expire_days: 30
 })
 
+const showMsg = (text, type = 'success') => {
+  message.text = text
+  message.type = type
+  setTimeout(() => { message.text = '' }, 3000)
+}
+
 const loadUsers = async () => {
   loading.value = true
   try {
     users.value = await usersApi.list()
   } catch (error) {
-    ElMessage.error('加载失败')
+    showMsg('加载失败', 'error')
   } finally {
     loading.value = false
   }
@@ -132,11 +240,11 @@ const showAddDialog = () => {
 const handleAdd = async () => {
   try {
     await usersApi.create(addForm)
-    ElMessage.success('添加成功')
+    showMsg(t('common.success'))
     addDialogVisible.value = false
     loadUsers()
   } catch (error) {
-    ElMessage.error(error.response?.data?.detail || '添加失败')
+    showMsg(error.response?.data?.detail || t('common.error'), 'error')
   }
 }
 
@@ -149,24 +257,22 @@ const showRenewDialog = (user) => {
 const handleRenew = async () => {
   try {
     await usersApi.renew(currentUser.value.email, renewDays.value)
-    ElMessage.success('续费成功')
+    showMsg(t('common.success'))
     renewDialogVisible.value = false
     loadUsers()
   } catch (error) {
-    ElMessage.error(error.response?.data?.detail || '续费失败')
+    showMsg(error.response?.data?.detail || t('common.error'), 'error')
   }
 }
 
 const handleDelete = async (user) => {
+  if (!confirm(`确定删除用户 ${user.email}？`)) return
   try {
-    await ElMessageBox.confirm(`确定删除用户 ${user.email}？`, '提示')
     await usersApi.delete(user.email)
-    ElMessage.success('删除成功')
+    showMsg(t('common.success'))
     loadUsers()
   } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.detail || '删除失败')
-    }
+    showMsg(error.response?.data?.detail || t('common.error'), 'error')
   }
 }
 
@@ -177,42 +283,30 @@ const showSubscriptions = (user) => {
 }
 
 const handleAddSubscription = async () => {
-  if (!newStock.value) {
-    ElMessage.warning('请输入股票代码或名称')
-    return
-  }
+  if (!newStock.value) return
   try {
     await usersApi.addSubscription(currentUser.value.email, { stock_code_or_name: newStock.value })
-    ElMessage.success('添加成功')
+    showMsg(t('common.success'))
     newStock.value = ''
-    loadUsers()
-    // 刷新当前用户数据
     const updatedUsers = await usersApi.list()
+    users.value = updatedUsers
     currentUser.value = updatedUsers.find(u => u.email === currentUser.value.email)
   } catch (error) {
-    ElMessage.error(error.response?.data?.detail || '添加失败')
+    showMsg(error.response?.data?.detail || t('common.error'), 'error')
   }
 }
 
 const handleDeleteSubscription = async (stock) => {
   try {
     await usersApi.deleteSubscription(currentUser.value.email, stock.code || stock.name)
-    ElMessage.success('删除成功')
-    loadUsers()
+    showMsg(t('common.success'))
     const updatedUsers = await usersApi.list()
+    users.value = updatedUsers
     currentUser.value = updatedUsers.find(u => u.email === currentUser.value.email)
   } catch (error) {
-    ElMessage.error(error.response?.data?.detail || '删除失败')
+    showMsg(error.response?.data?.detail || t('common.error'), 'error')
   }
 }
 
 onMounted(loadUsers)
 </script>
-
-<style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-</style>

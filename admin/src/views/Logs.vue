@@ -1,72 +1,151 @@
 <template>
-  <div class="logs-page">
-    <el-tabs v-model="activeTab">
-      <el-tab-pane label="系统状态" name="status">
-        <el-card v-loading="loadingStatus">
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="CPU使用率">{{ systemStatus.cpu_percent }}%</el-descriptions-item>
-            <el-descriptions-item label="内存使用率">{{ systemStatus.memory?.percent }}%</el-descriptions-item>
-            <el-descriptions-item label="磁盘使用率">{{ systemStatus.disk?.percent }}%</el-descriptions-item>
-            <el-descriptions-item label="Python版本">{{ systemStatus.python_version }}</el-descriptions-item>
-          </el-descriptions>
-        </el-card>
-      </el-tab-pane>
+  <div>
+    <div class="page-header d-print-none">
+      <div class="row align-items-center">
+        <div class="col">
+          <h2 class="page-title">{{ t('logs.title') }}</h2>
+        </div>
+      </div>
+    </div>
 
-      <el-tab-pane label="应用日志" name="app">
-        <el-card>
-          <template #header>
-            <div class="card-header">
-              <span>应用日志</span>
-              <el-button @click="loadAppLog" :loading="loadingApp">刷新</el-button>
+    <!-- Tabs -->
+    <div class="card">
+      <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs">
+          <li class="nav-item">
+            <a class="nav-link" :class="{ active: activeTab === 'status' }" href="#" @click.prevent="activeTab = 'status'">
+              {{ t('logs.systemStatus') }}
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" :class="{ active: activeTab === 'app' }" href="#" @click.prevent="switchTab('app')">
+              {{ t('logs.appLog') }}
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" :class="{ active: activeTab === 'error' }" href="#" @click.prevent="switchTab('error')">
+              {{ t('logs.errorLog') }}
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" :class="{ active: activeTab === 'jobs' }" href="#" @click.prevent="switchTab('jobs')">
+              {{ t('logs.scheduledJobs') }}
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card-body">
+        <!-- 系统状态 -->
+        <div v-if="activeTab === 'status'">
+          <div v-if="loadingStatus" class="text-center py-4">
+            <div class="spinner-border text-primary"></div>
+          </div>
+          <div v-else class="row g-3">
+            <div class="col-sm-6 col-lg-3">
+              <div class="card">
+                <div class="card-body p-3 text-center">
+                  <div class="text-muted mb-1">{{ t('logs.cpu') }}</div>
+                  <div class="h2 mb-0">{{ systemStatus.cpu_percent || 0 }}%</div>
+                  <div class="progress mt-2" style="height: 4px;">
+                    <div class="progress-bar" :class="cpuClass" :style="{ width: (systemStatus.cpu_percent || 0) + '%' }"></div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </template>
-          <el-input
-            v-model="appLog"
-            type="textarea"
-            :rows="20"
-            readonly
-            class="log-textarea"
-          />
-        </el-card>
-      </el-tab-pane>
-
-      <el-tab-pane label="错误日志" name="error">
-        <el-card>
-          <template #header>
-            <div class="card-header">
-              <span>错误日志</span>
-              <el-button @click="loadErrorLog" :loading="loadingError">刷新</el-button>
+            <div class="col-sm-6 col-lg-3">
+              <div class="card">
+                <div class="card-body p-3 text-center">
+                  <div class="text-muted mb-1">{{ t('logs.memory') }}</div>
+                  <div class="h2 mb-0">{{ systemStatus.memory?.percent || 0 }}%</div>
+                  <div class="progress mt-2" style="height: 4px;">
+                    <div class="progress-bar bg-blue" :style="{ width: (systemStatus.memory?.percent || 0) + '%' }"></div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </template>
-          <el-input
-            v-model="errorLog"
-            type="textarea"
-            :rows="20"
-            readonly
-            class="log-textarea error-log"
-          />
-        </el-card>
-      </el-tab-pane>
+            <div class="col-sm-6 col-lg-3">
+              <div class="card">
+                <div class="card-body p-3 text-center">
+                  <div class="text-muted mb-1">{{ t('logs.disk') }}</div>
+                  <div class="h2 mb-0">{{ systemStatus.disk?.percent || 0 }}%</div>
+                  <div class="progress mt-2" style="height: 4px;">
+                    <div class="progress-bar bg-green" :style="{ width: (systemStatus.disk?.percent || 0) + '%' }"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+              <div class="card">
+                <div class="card-body p-3 text-center">
+                  <div class="text-muted mb-1">{{ t('logs.pythonVersion') }}</div>
+                  <div class="h4 mb-0">{{ systemStatus.python_version || '-' }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
-      <el-tab-pane label="定时任务" name="jobs">
-        <el-card v-loading="loadingJobs">
-          <el-table :data="jobs">
-            <el-table-column prop="id" label="任务ID" />
-            <el-table-column prop="name" label="任务名称" />
-            <el-table-column prop="trigger" label="触发器" />
-            <el-table-column prop="next_run" label="下次执行" />
-          </el-table>
-        </el-card>
-      </el-tab-pane>
-    </el-tabs>
+        <!-- 应用日志 -->
+        <div v-if="activeTab === 'app'">
+          <div class="d-flex justify-content-end mb-2">
+            <button class="btn btn-sm btn-secondary" @click="loadAppLog" :disabled="loadingApp">
+              <span v-if="loadingApp" class="spinner-border spinner-border-sm me-1"></span>
+              {{ t('common.refresh') }}
+            </button>
+          </div>
+          <pre class="bg-dark text-success p-3 rounded" style="height: 500px; overflow-y: auto; font-size: 0.8rem; line-height: 1.5;">{{ appLog }}</pre>
+        </div>
+
+        <!-- 错误日志 -->
+        <div v-if="activeTab === 'error'">
+          <div class="d-flex justify-content-end mb-2">
+            <button class="btn btn-sm btn-secondary" @click="loadErrorLog" :disabled="loadingError">
+              <span v-if="loadingError" class="spinner-border spinner-border-sm me-1"></span>
+              {{ t('common.refresh') }}
+            </button>
+          </div>
+          <pre class="bg-dark text-danger p-3 rounded" style="height: 500px; overflow-y: auto; font-size: 0.8rem; line-height: 1.5;">{{ errorLog }}</pre>
+        </div>
+
+        <!-- 定时任务 -->
+        <div v-if="activeTab === 'jobs'">
+          <div v-if="loadingJobs" class="text-center py-4">
+            <div class="spinner-border text-primary"></div>
+          </div>
+          <table v-else class="table table-vcenter card-table">
+            <thead>
+              <tr>
+                <th>{{ t('logs.jobId') }}</th>
+                <th>{{ t('logs.jobName') }}</th>
+                <th>{{ t('logs.trigger') }}</th>
+                <th>{{ t('logs.nextRun') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="jobs.length === 0">
+                <td colspan="4" class="text-center text-muted py-3">暂无任务</td>
+              </tr>
+              <tr v-for="job in jobs" :key="job.id">
+                <td><small class="text-muted font-monospace">{{ job.id }}</small></td>
+                <td>{{ job.name }}</td>
+                <td class="text-muted">{{ job.trigger }}</td>
+                <td class="text-muted">{{ job.next_run }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { logsApi } from '../utils/api'
 
+const { t } = useI18n()
 const activeTab = ref('status')
 const loadingStatus = ref(false)
 const loadingApp = ref(false)
@@ -81,12 +160,26 @@ const jobs = ref([])
 const appLog = computed(() => appLogLines.value.join('\n'))
 const errorLog = computed(() => errorLogLines.value.join('\n'))
 
+const cpuClass = computed(() => {
+  const cpu = systemStatus.value.cpu_percent || 0
+  if (cpu > 80) return 'bg-danger'
+  if (cpu > 60) return 'bg-warning'
+  return 'bg-success'
+})
+
+const switchTab = (tab) => {
+  activeTab.value = tab
+  if (tab === 'app' && appLogLines.value.length === 0) loadAppLog()
+  if (tab === 'error' && errorLogLines.value.length === 0) loadErrorLog()
+  if (tab === 'jobs' && jobs.value.length === 0) loadJobs()
+}
+
 const loadSystemStatus = async () => {
   loadingStatus.value = true
   try {
     systemStatus.value = await logsApi.getSystemStatus()
   } catch (error) {
-    ElMessage.error('加载系统状态失败')
+    console.error('加载系统状态失败', error)
   } finally {
     loadingStatus.value = false
   }
@@ -98,7 +191,7 @@ const loadAppLog = async () => {
     const res = await logsApi.getAppLog(200)
     appLogLines.value = res.lines
   } catch (error) {
-    ElMessage.error('加载日志失败')
+    console.error('加载日志失败', error)
   } finally {
     loadingApp.value = false
   }
@@ -110,7 +203,7 @@ const loadErrorLog = async () => {
     const res = await logsApi.getErrorLog(200)
     errorLogLines.value = res.lines
   } catch (error) {
-    ElMessage.error('加载日志失败')
+    console.error('加载日志失败', error)
   } finally {
     loadingError.value = false
   }
@@ -121,7 +214,7 @@ const loadJobs = async () => {
   try {
     jobs.value = await logsApi.getJobs()
   } catch (error) {
-    ElMessage.error('加载任务状态失败')
+    console.error('加载任务状态失败', error)
   } finally {
     loadingJobs.value = false
   }
@@ -130,24 +223,5 @@ const loadJobs = async () => {
 onMounted(() => {
   loadSystemStatus()
   loadAppLog()
-  loadErrorLog()
-  loadJobs()
 })
 </script>
-
-<style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.log-textarea :deep(.el-textarea__inner) {
-  font-family: monospace;
-  font-size: 12px;
-}
-
-.error-log :deep(.el-textarea__inner) {
-  color: #f56c6c;
-}
-</style>

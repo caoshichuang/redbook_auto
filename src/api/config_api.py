@@ -962,3 +962,102 @@ async def get_star_stocks(current_user: str = Depends(get_current_user)):
 async def get_scheduler_config(current_user: str = Depends(get_current_user)):
     """获取定时任务配置 - 兼容旧接口"""
     return _get_scheduler_config()
+
+
+# ============================================================================
+# 策略注册表接口（Task 7.3 / 7.4）
+# ============================================================================
+
+
+@router.get("/strategies")
+async def list_strategies(
+    market: Optional[str] = None,
+    current_user: str = Depends(get_current_user),
+):
+    """
+    获取所有策略列表。
+    可通过 ?market=US_STOCK|A_SHARE|IPO|HOT 过滤适用指定市场的策略。
+    """
+    from ..strategies import STRATEGY_REGISTRY
+
+    strategies = list(STRATEGY_REGISTRY.values())
+
+    if market:
+        strategies = [s for s in strategies if market in s.markets]
+
+    return {
+        "strategies": [
+            {
+                "id": s.name,
+                "display_name": s.display_name,
+                "description": s.description,
+                "category": s.category,
+                "markets": s.markets,
+                "version": s.version,
+                "author": s.author,
+            }
+            for s in strategies
+        ]
+    }
+
+
+@router.get("/strategies/{market}/enabled")
+async def get_enabled_strategies(
+    market: str,
+    current_user: str = Depends(get_current_user),
+):
+    """获取指定市场已启用的策略 id 列表（未配置时返回全部策略 id）"""
+    from ..strategies import STRATEGY_REGISTRY
+
+    dynamic_config = _load_dynamic_config()
+    key = f"strategy.{market}.enabled"
+    enabled_raw = dynamic_config.get("strategies", {}).get(key, None)
+
+    if enabled_raw is None:
+        # 未配置时返回该市场的全部策略
+        all_ids = [s.name for s in STRATEGY_REGISTRY.values() if market in s.markets]
+        return {"market": market, "enabled_strategy_ids": all_ids, "configured": False}
+
+    if isinstance(enabled_raw, str):
+        enabled_ids = json.loads(enabled_raw)
+    else:
+        enabled_ids = enabled_raw
+
+    return {"market": market, "enabled_strategy_ids": enabled_ids, "configured": True}
+
+
+@router.put("/strategies/{market}/enabled")
+async def set_enabled_strategies(
+    market: str,
+    strategy_ids: List[str],
+    current_user: str = Depends(get_current_user),
+):
+    """
+    设置指定市场启用的策略列表，持久化到动态配置。
+    key 格式：strategy.{market}.enabled，value 为策略 id 列表（JSON）。
+    """
+    from ..strategies import STRATEGY_REGISTRY
+
+    # 校验策略 id 合法性
+    unknown = [sid for sid in strategy_ids if sid not in STRATEGY_REGISTRY]
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail=f"未知策略 id: {unknown}，请先通过 GET /api/config/strategies 查询可用策略",
+        )
+
+    dynamic_config = _load_dynamic_config()
+    if "strategies" not in dynamic_config:
+        dynamic_config["strategies"] = {}
+
+    key = f"strategy.{market}.enabled"
+    dynamic_config["strategies"][key] = strategy_ids
+    _save_dynamic_config(dynamic_config)
+
+    logger.info(f"管理员 {current_user} 更新市场 {market} 的策略配置: {strategy_ids}")
+    return {
+        "success": True,
+        "message": f"市场 {market} 策略配置已更新",
+        "market": market,
+        "enabled_strategy_ids": strategy_ids,
+    }

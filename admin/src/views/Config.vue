@@ -1,497 +1,396 @@
 <template>
-  <div class="config-container">
-    <el-card class="header-card">
-      <template #header>
-        <div class="card-header">
-          <span>⚙️ System Configuration</span>
-          <div class="header-actions">
-            <el-button type="primary" @click="saveAll" :loading="saving">
-              <el-icon><Check /></el-icon>
-              Save All
-            </el-button>
-            <el-button @click="resetAll">
-              <el-icon><RefreshLeft /></el-icon>
-              Reset
-            </el-button>
-            <el-button type="success" @click="backupConfig">
-              <el-icon><Download /></el-icon>
-              Backup
-            </el-button>
-            <el-button type="warning" @click="showRestoreDialog">
-              <el-icon><Upload /></el-icon>
-              Restore
-            </el-button>
+  <div>
+    <div class="page-header d-print-none">
+      <div class="row align-items-center">
+        <div class="col">
+          <h2 class="page-title">{{ t('config.title') }}</h2>
+        </div>
+        <div class="col-auto d-flex gap-2">
+          <button class="btn btn-primary" @click="saveAll" :disabled="saving">
+            <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
+            {{ t('config.saveAll') }}
+          </button>
+          <button class="btn btn-secondary" @click="backupConfig">{{ t('config.backup') }}</button>
+          <button class="btn btn-warning" @click="showRestoreDialog">{{ t('config.restore') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 消息提示 -->
+    <div v-if="message.text" class="alert mb-3" :class="message.type === 'success' ? 'alert-success' : 'alert-danger'">
+      {{ message.text }}
+    </div>
+
+    <div class="row">
+      <!-- 左侧分类导航 -->
+      <div class="col-lg-3">
+        <div class="card">
+          <div class="list-group list-group-flush">
+            <a
+              v-for="cat in categories"
+              :key="cat.id"
+              href="#"
+              class="list-group-item list-group-item-action d-flex align-items-center gap-2"
+              :class="{ active: activeCategory === cat.id }"
+              @click.prevent="handleCategoryChange(cat.id)"
+            >
+              <span>{{ cat.icon }}</span>
+              <span>{{ cat.name }}</span>
+            </a>
           </div>
         </div>
-      </template>
-      <p class="description">
-        Manage all system configurations. Changes will take effect after saving.
-        Some configurations require a service restart.
-      </p>
-    </el-card>
-
-    <el-row :gutter="20">
-      <!-- 左侧分类导航 -->
-      <el-col :span="6">
-        <el-card class="category-card">
-          <el-menu
-            :default-active="activeCategory"
-            @select="handleCategoryChange"
-          >
-            <el-menu-item 
-              v-for="cat in categories" 
-              :key="cat.id" 
-              :index="cat.id"
-            >
-              <el-icon><component :is="cat.icon" /></el-icon>
-              <span>{{ cat.name }}</span>
-            </el-menu-item>
-          </el-menu>
-        </el-card>
-      </el-col>
+      </div>
 
       <!-- 右侧配置表单 -->
-      <el-col :span="18">
-        <el-card class="config-card">
-          <template #header>
-            <div class="config-header">
-              <h3>{{ currentCategory?.name || 'Configuration' }}</h3>
-              <p>{{ currentCategory?.description }}</p>
+      <div class="col-lg-9">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">{{ currentCategoryLabel }}</h3>
+          </div>
+          <div class="card-body">
+
+            <!-- AI 配置 -->
+            <div v-if="activeCategory === 'ai'">
+              <div class="mb-3">
+                <label class="form-label">DeepSeek API Key</label>
+                <input type="password" class="form-control" v-model="aiConfig.DEEPSEEK_API_KEY" placeholder="sk-xxxxxxxx" />
+                <small class="text-muted">Your DeepSeek API key</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">DeepSeek Base URL</label>
+                <input type="text" class="form-control" v-model="aiConfig.DEEPSEEK_BASE_URL" placeholder="https://api.deepseek.com" />
+                <small class="text-muted">DeepSeek API base URL</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">DeepSeek Model</label>
+                <select class="form-select" v-model="aiConfig.DEEPSEEK_MODEL">
+                  <option value="deepseek-chat">deepseek-chat</option>
+                  <option value="deepseek-coder">deepseek-coder</option>
+                </select>
+                <small class="text-muted">Model to use for content generation</small>
+              </div>
             </div>
-          </template>
 
-          <!-- AI 配置 -->
-          <div v-if="activeCategory === 'ai'" class="config-form">
-            <el-form :model="aiConfig" label-width="180px">
-              <el-form-item label="DeepSeek API Key">
-                <el-input 
-                  v-model="aiConfig.DEEPSEEK_API_KEY" 
-                  type="password" 
-                  show-password
-                  placeholder="sk-xxxxxxxx"
-                />
-                <div class="form-tip">Your DeepSeek API key</div>
-              </el-form-item>
-              <el-form-item label="DeepSeek Base URL">
-                <el-input 
-                  v-model="aiConfig.DEEPSEEK_BASE_URL" 
-                  placeholder="https://api.deepseek.com"
-                />
-                <div class="form-tip">DeepSeek API base URL</div>
-              </el-form-item>
-              <el-form-item label="DeepSeek Model">
-                <el-select v-model="aiConfig.DEEPSEEK_MODEL">
-                  <el-option label="deepseek-chat" value="deepseek-chat" />
-                  <el-option label="deepseek-coder" value="deepseek-coder" />
-                </el-select>
-                <div class="form-tip">Model to use for content generation</div>
-              </el-form-item>
-            </el-form>
-          </div>
+            <!-- 数据源配置 -->
+            <div v-if="activeCategory === 'datasource'">
+              <div class="mb-3">
+                <label class="form-label">Tushare Token</label>
+                <input type="password" class="form-control" v-model="datasourceConfig.TUSHARE_TOKEN" placeholder="Your Tushare token" />
+                <small class="text-muted">Tushare API token for data access</small>
+              </div>
+            </div>
 
-          <!-- 数据源配置 -->
-          <div v-if="activeCategory === 'datasource'" class="config-form">
-            <el-form :model="datasourceConfig" label-width="180px">
-              <el-form-item label="Tushare Token">
-                <el-input 
-                  v-model="datasourceConfig.TUSHARE_TOKEN" 
-                  type="password" 
-                  show-password
-                  placeholder="Your Tushare token"
-                />
-                <div class="form-tip">Tushare API token for data access</div>
-              </el-form-item>
-            </el-form>
-          </div>
+            <!-- 邮件配置 -->
+            <div v-if="activeCategory === 'email'">
+              <div class="mb-3">
+                <label class="form-label">Sender Email</label>
+                <input type="email" class="form-control" v-model="emailConfig.QQ_EMAIL" placeholder="your_email@qq.com" />
+                <small class="text-muted">QQ email address for sending</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Auth Code</label>
+                <input type="password" class="form-control" v-model="emailConfig.QQ_EMAIL_AUTH_CODE" placeholder="16-char auth code" />
+                <small class="text-muted">QQ email authorization code</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Receiver Email</label>
+                <input type="email" class="form-control" v-model="emailConfig.RECEIVER_EMAIL" placeholder="receiver@example.com" />
+                <small class="text-muted">Email address to receive notifications</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">SMTP Server</label>
+                <input type="text" class="form-control" v-model="emailConfig.SMTP_SERVER" placeholder="smtp.qq.com" />
+                <small class="text-muted">SMTP server address</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">SMTP Port</label>
+                <input type="number" class="form-control" v-model.number="emailConfig.SMTP_PORT" min="1" max="65535" />
+                <small class="text-muted">SMTP port (usually 465 for SSL)</small>
+              </div>
+              <button class="btn btn-secondary" @click="testEmail">{{ t('config.testEmail') }}</button>
+            </div>
 
-          <!-- 邮件配置 -->
-          <div v-if="activeCategory === 'email'" class="config-form">
-            <el-form :model="emailConfig" label-width="180px">
-              <el-form-item label="Sender Email">
-                <el-input 
-                  v-model="emailConfig.QQ_EMAIL" 
-                  placeholder="your_email@qq.com"
-                />
-                <div class="form-tip">QQ email address for sending</div>
-              </el-form-item>
-              <el-form-item label="Auth Code">
-                <el-input 
-                  v-model="emailConfig.QQ_EMAIL_AUTH_CODE" 
-                  type="password" 
-                  show-password
-                  placeholder="16-char auth code"
-                />
-                <div class="form-tip">QQ email authorization code</div>
-              </el-form-item>
-              <el-form-item label="Receiver Email">
-                <el-input 
-                  v-model="emailConfig.RECEIVER_EMAIL" 
-                  placeholder="receiver@example.com"
-                />
-                <div class="form-tip">Email address to receive notifications</div>
-              </el-form-item>
-              <el-form-item label="SMTP Server">
-                <el-input 
-                  v-model="emailConfig.SMTP_SERVER" 
-                  placeholder="smtp.qq.com"
-                />
-                <div class="form-tip">SMTP server address</div>
-              </el-form-item>
-              <el-form-item label="SMTP Port">
-                <el-input-number 
-                  v-model="emailConfig.SMTP_PORT" 
-                  :min="1" 
-                  :max="65535"
-                />
-                <div class="form-tip">SMTP port (usually 465 for SSL)</div>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="testEmail">
-                  Test Email Configuration
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </div>
+            <!-- 应用配置 -->
+            <div v-if="activeCategory === 'app'">
+              <div class="mb-3">
+                <label class="form-label">Base URL</label>
+                <input type="text" class="form-control" v-model="appConfig.BASE_URL" placeholder="http://your-server:8080" />
+                <small class="text-muted">Application access URL</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Log Level</label>
+                <select class="form-select" v-model="appConfig.LOG_LEVEL">
+                  <option value="DEBUG">DEBUG</option>
+                  <option value="INFO">INFO</option>
+                  <option value="WARNING">WARNING</option>
+                  <option value="ERROR">ERROR</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Log Rotation</label>
+                <input type="text" class="form-control" v-model="appConfig.LOG_ROTATION" placeholder="10 MB" />
+                <small class="text-muted">Log file rotation size (e.g., 10 MB)</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Log Retention</label>
+                <input type="text" class="form-control" v-model="appConfig.LOG_RETENTION" placeholder="30 days" />
+                <small class="text-muted">Log file retention period</small>
+              </div>
+            </div>
 
-          <!-- 应用配置 -->
-          <div v-if="activeCategory === 'app'" class="config-form">
-            <el-form :model="appConfig" label-width="180px">
-              <el-form-item label="Base URL">
-                <el-input 
-                  v-model="appConfig.BASE_URL" 
-                  placeholder="http://your-server:8080"
-                />
-                <div class="form-tip">Application access URL</div>
-              </el-form-item>
-              <el-form-item label="Log Level">
-                <el-select v-model="appConfig.LOG_LEVEL">
-                  <el-option label="DEBUG" value="DEBUG" />
-                  <el-option label="INFO" value="INFO" />
-                  <el-option label="WARNING" value="WARNING" />
-                  <el-option label="ERROR" value="ERROR" />
-                </el-select>
-                <div class="form-tip">Logging level</div>
-              </el-form-item>
-              <el-form-item label="Log Rotation">
-                <el-input 
-                  v-model="appConfig.LOG_ROTATION" 
-                  placeholder="10 MB"
-                />
-                <div class="form-tip">Log file rotation size (e.g., 10 MB, 1 GB)</div>
-              </el-form-item>
-              <el-form-item label="Log Retention">
-                <el-input 
-                  v-model="appConfig.LOG_RETENTION" 
-                  placeholder="30 days"
-                />
-                <div class="form-tip">Log file retention period (e.g., 30 days, 1 week)</div>
-              </el-form-item>
-            </el-form>
-          </div>
-
-          <!-- 明星股配置 -->
-          <div v-if="activeCategory === 'star_stocks'" class="config-form">
-            <el-tabs>
-              <el-tab-pane label="A股">
-                <div v-for="(stock, index) in starStocksConfig['A股']" :key="index" class="stock-item">
-                  <el-input v-model="stock.code" placeholder="Code" style="width: 120px" />
-                  <el-input v-model="stock.name" placeholder="Name" style="width: 150px; margin-left: 10px" />
-                  <el-button type="danger" size="small" @click="removeStock('A股', index)" style="margin-left: 10px">
-                    <el-icon><Delete /></el-icon>
-                  </el-button>
+            <!-- 明星股票配置 -->
+            <div v-if="activeCategory === 'star_stocks'">
+              <ul class="nav nav-tabs mb-3">
+                <li class="nav-item" v-for="market in ['A股', '港股', '美股']" :key="market">
+                  <a class="nav-link" :class="{ active: starTab === market }" href="#" @click.prevent="starTab = market">
+                    {{ market }}
+                  </a>
+                </li>
+              </ul>
+              <div v-for="market in ['A股', '港股', '美股']" :key="market" v-show="starTab === market">
+                <div v-for="(stock, index) in (starStocksConfig[market] || [])" :key="index" class="d-flex gap-2 mb-2">
+                  <input type="text" class="form-control" v-model="stock.code" placeholder="Code" />
+                  <input type="text" class="form-control" v-model="stock.name" placeholder="Name" />
+                  <button class="btn btn-ghost-danger btn-sm" @click="removeStock(market, index)">✕</button>
                 </div>
-                <el-button type="primary" @click="addStock('A股')" style="margin-top: 10px">
-                  <el-icon><Plus /></el-icon>
-                  Add A-Share Stock
-                </el-button>
-              </el-tab-pane>
-              <el-tab-pane label="港股">
-                <div v-for="(stock, index) in starStocksConfig['港股']" :key="index" class="stock-item">
-                  <el-input v-model="stock.code" placeholder="Code" style="width: 120px" />
-                  <el-input v-model="stock.name" placeholder="Name" style="width: 150px; margin-left: 10px" />
-                  <el-button type="danger" size="small" @click="removeStock('港股', index)" style="margin-left: 10px">
-                    <el-icon><Delete /></el-icon>
-                  </el-button>
-                </div>
-                <el-button type="primary" @click="addStock('港股')" style="margin-top: 10px">
-                  <el-icon><Plus /></el-icon>
-                  Add HK Stock
-                </el-button>
-              </el-tab-pane>
-              <el-tab-pane label="美股">
-                <div v-for="(stock, index) in starStocksConfig['美股']" :key="index" class="stock-item">
-                  <el-input v-model="stock.code" placeholder="Code" style="width: 120px" />
-                  <el-input v-model="stock.name" placeholder="Name" style="width: 150px; margin-left: 10px" />
-                  <el-button type="danger" size="small" @click="removeStock('美股', index)" style="margin-left: 10px">
-                    <el-icon><Delete /></el-icon>
-                  </el-button>
-                </div>
-                <el-button type="primary" @click="addStock('美股')" style="margin-top: 10px">
-                  <el-icon><Plus /></el-icon>
-                  Add US Stock
-                </el-button>
-              </el-tab-pane>
-            </el-tabs>
-          </div>
+                <button class="btn btn-primary btn-sm mt-2" @click="addStock(market)">+ Add {{ market }} Stock</button>
+              </div>
+            </div>
 
-          <!-- 业务阈值配置 -->
-          <div v-if="activeCategory === 'thresholds'" class="config-form">
-            <el-form :model="thresholdsConfig" label-width="180px">
-              <el-form-item label="Hot Stock Threshold">
-                <el-input-number 
-                  v-model="thresholdsConfig.hot_stock_threshold" 
-                  :min="0" 
-                  :max="100" 
-                  :precision="1"
-                  :step="0.1"
-                />
-                <span style="margin-left: 10px">%</span>
-                <div class="form-tip">Price change threshold for hot stock alerts</div>
-              </el-form-item>
-              <el-form-item label="Limit Up/Down Threshold">
-                <el-input-number 
-                  v-model="thresholdsConfig.limit_up_down_threshold" 
-                  :min="0" 
-                  :max="100" 
-                  :precision="1"
-                  :step="0.1"
-                />
-                <span style="margin-left: 10px">%</span>
-                <div class="form-tip">Threshold for limit up/down detection</div>
-              </el-form-item>
-            </el-form>
-          </div>
+            <!-- 业务阈值配置 -->
+            <div v-if="activeCategory === 'thresholds'">
+              <div class="mb-3">
+                <label class="form-label">Hot Stock Threshold (%)</label>
+                <input type="number" class="form-control" v-model.number="thresholdsConfig.hot_stock_threshold" min="0" max="100" step="0.1" />
+                <small class="text-muted">Price change threshold for hot stock alerts</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Limit Up/Down Threshold (%)</label>
+                <input type="number" class="form-control" v-model.number="thresholdsConfig.limit_up_down_threshold" min="0" max="100" step="0.1" />
+                <small class="text-muted">Threshold for limit up/down detection</small>
+              </div>
+            </div>
 
-          <!-- 定时任务配置 -->
-          <div v-if="activeCategory === 'scheduler'" class="config-form">
-            <el-form :model="schedulerConfig" label-width="180px">
-              <el-form-item label="US Stock Summary">
-                <el-time-picker 
-                  v-model="schedulerConfig.us_stock_time" 
-                  format="HH:mm"
-                  value-format="HH:mm"
-                  placeholder="09:00"
-                />
-                <div class="form-tip">Daily US stock market summary time</div>
-              </el-form-item>
-              <el-form-item label="A-Share Summary">
-                <el-time-picker 
-                  v-model="schedulerConfig.a_share_time" 
-                  format="HH:mm"
-                  value-format="HH:mm"
-                  placeholder="17:00"
-                />
-                <div class="form-tip">Daily A-share and HK stock summary time</div>
-              </el-form-item>
-              <el-form-item label="Hot Stocks">
-                <el-time-picker 
-                  v-model="schedulerConfig.hot_stock_time" 
-                  format="HH:mm"
-                  value-format="HH:mm"
-                  placeholder="17:30"
-                />
-                <div class="form-tip">Daily hot stock analysis time</div>
-              </el-form-item>
-              <el-form-item label="IPO Analysis">
-                <el-time-picker 
-                  v-model="schedulerConfig.ipo_time" 
-                  format="HH:mm"
-                  value-format="HH:mm"
-                  placeholder="20:00"
-                />
-                <div class="form-tip">Daily IPO analysis time</div>
-              </el-form-item>
-            </el-form>
-          </div>
+            <!-- 定时任务配置 -->
+            <div v-if="activeCategory === 'scheduler'">
+              <div class="mb-3">
+                <label class="form-label">US Stock Summary Time</label>
+                <input type="time" class="form-control" v-model="schedulerConfig.us_stock_time" />
+                <small class="text-muted">Daily US stock market summary time</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">A-Share Summary Time</label>
+                <input type="time" class="form-control" v-model="schedulerConfig.a_share_time" />
+                <small class="text-muted">Daily A-share and HK stock summary time</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Hot Stocks Time</label>
+                <input type="time" class="form-control" v-model="schedulerConfig.hot_stock_time" />
+                <small class="text-muted">Daily hot stock analysis time</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">IPO Analysis Time</label>
+                <input type="time" class="form-control" v-model="schedulerConfig.ipo_time" />
+                <small class="text-muted">Daily IPO analysis time</small>
+              </div>
+            </div>
 
-          <!-- 项目信息配置 -->
-          <div v-if="activeCategory === 'project'" class="config-form">
-            <el-form :model="projectConfig" label-width="180px">
-              <el-form-item label="Project Name">
-                <el-input 
-                  v-model="projectConfig.project_name" 
-                  placeholder="FinanceSail"
-                />
-                <div class="form-tip">Project display name</div>
-              </el-form-item>
-              <el-form-item label="Project Name (EN)">
-                <el-input 
-                  v-model="projectConfig.project_name_en" 
-                  placeholder="FinanceSail"
-                />
-                <div class="form-tip">Project English name</div>
-              </el-form-item>
-              <el-form-item label="Version">
-                <el-input 
-                  v-model="projectConfig.project_version" 
-                  placeholder="1.0.0"
-                />
-                <div class="form-tip">Project version number</div>
-              </el-form-item>
-              <el-form-item label="Description">
-                <el-input 
-                  v-model="projectConfig.project_description" 
-                  type="textarea" 
-                  :rows="3"
-                  placeholder="Automated Financial Content Distribution System"
-                />
-                <div class="form-tip">Project description</div>
-              </el-form-item>
-              <el-form-item label="Logo">
-                <el-input 
-                  v-model="projectConfig.project_logo" 
-                  placeholder="⛵"
-                />
-                <div class="form-tip">Project logo (emoji or text)</div>
-              </el-form-item>
-              <el-form-item label="Slogan">
-                <el-input 
-                  v-model="projectConfig.project_slogan" 
-                  placeholder="Empowering Financial Content Distribution"
-                />
-                <div class="form-tip">Project slogan</div>
-              </el-form-item>
-            </el-form>
-          </div>
+            <!-- 项目信息配置 -->
+            <div v-if="activeCategory === 'project'">
+              <div class="mb-3">
+                <label class="form-label">Project Name</label>
+                <input type="text" class="form-control" v-model="projectConfig.project_name" placeholder="FinanceSail" />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Project Name (EN)</label>
+                <input type="text" class="form-control" v-model="projectConfig.project_name_en" placeholder="FinanceSail" />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Version</label>
+                <input type="text" class="form-control" v-model="projectConfig.project_version" placeholder="1.0.0" />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" v-model="projectConfig.project_description" rows="3" placeholder="Automated Financial Content Distribution System"></textarea>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Logo</label>
+                <input type="text" class="form-control" v-model="projectConfig.project_logo" placeholder="⛵" />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Slogan</label>
+                <input type="text" class="form-control" v-model="projectConfig.project_slogan" placeholder="Empowering Financial Content Distribution" />
+              </div>
+            </div>
 
-          <!-- 节假日配置 -->
-          <div v-if="activeCategory === 'holidays'" class="config-form">
-            <el-tabs>
-              <el-tab-pane 
-                v-for="year in Object.keys(holidaysConfig)" 
-                :key="year" 
-                :label="year"
-              >
-                <div class="holiday-list">
-                  <el-tag 
-                    v-for="(date, index) in holidaysConfig[year]" 
+            <!-- 节假日配置 -->
+            <div v-if="activeCategory === 'holidays'">
+              <ul class="nav nav-tabs mb-3">
+                <li class="nav-item" v-for="year in Object.keys(holidaysConfig)" :key="year">
+                  <a class="nav-link" :class="{ active: holidayTab === year }" href="#" @click.prevent="holidayTab = year">
+                    {{ year }}
+                  </a>
+                </li>
+              </ul>
+              <div v-for="year in Object.keys(holidaysConfig)" :key="year" v-show="holidayTab === year">
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                  <span
+                    v-for="(date, index) in holidaysConfig[year]"
                     :key="index"
-                    closable
-                    @close="removeHoliday(year, index)"
-                    style="margin: 5px"
+                    class="badge bg-azure-lt text-azure d-flex align-items-center gap-1"
+                    style="font-size: 0.85rem; padding: 6px 10px;"
                   >
                     {{ date }}
-                  </el-tag>
+                    <button type="button" class="btn-close btn-close-sm" style="font-size: 0.6rem;" @click="removeHoliday(year, index)"></button>
+                  </span>
                 </div>
-                <div style="margin-top: 10px">
-                  <el-date-picker 
-                    v-model="newHoliday[year]" 
-                    type="date" 
-                    placeholder="Add holiday"
-                    value-format="YYYY-MM-DD"
-                  />
-                  <el-button 
-                    type="primary" 
-                    @click="addHoliday(year)" 
-                    style="margin-left: 10px"
-                  >
-                    Add
-                  </el-button>
+                <div class="d-flex gap-2 mt-2">
+                  <input type="date" class="form-control" v-model="newHoliday[year]" style="width: 200px;" />
+                  <button class="btn btn-primary btn-sm" @click="addHoliday(year)">Add</button>
                 </div>
-              </el-tab-pane>
-            </el-tabs>
-            <el-button type="primary" @click="addYear" style="margin-top: 10px">
-              <el-icon><Plus /></el-icon>
-              Add Year
-            </el-button>
-          </div>
+              </div>
+              <button class="btn btn-secondary btn-sm mt-3" @click="addYear">{{ t('config.addYear') }}</button>
+            </div>
 
-          <!-- 分发平台配置 -->
-          <div v-if="activeCategory === 'distribution'" class="config-form">
-            <el-form :model="distributionConfig" label-width="180px">
-              <el-form-item label="WeChat App ID">
-                <el-input 
-                  v-model="distributionConfig.wechat_app_id" 
-                  placeholder="Your WeChat App ID"
-                />
-                <div class="form-tip">WeChat Official Account App ID</div>
-              </el-form-item>
-              <el-form-item label="WeChat App Secret">
-                <el-input 
-                  v-model="distributionConfig.wechat_app_secret" 
-                  type="password" 
-                  show-password
-                  placeholder="Your WeChat App Secret"
-                />
-                <div class="form-tip">WeChat Official Account App Secret</div>
-              </el-form-item>
-              <el-form-item label="Toutiao Access Token">
-                <el-input 
-                  v-model="distributionConfig.toutiao_access_token" 
-                  type="password" 
-                  show-password
-                  placeholder="Your Toutiao Access Token"
-                />
-                <div class="form-tip">Toutiao (ByteDance) API access token</div>
-              </el-form-item>
-              <el-form-item label="WxPusher App Token">
-                <el-input 
-                  v-model="distributionConfig.wxpusher_app_token" 
-                  type="password" 
-                  show-password
-                  placeholder="Your WxPusher App Token"
-                />
-                <div class="form-tip">WxPusher application token for WeChat notifications</div>
-              </el-form-item>
-            </el-form>
-          </div>
+            <!-- 分发平台配置 -->
+            <div v-if="activeCategory === 'distribution'">
+              <div class="mb-3">
+                <label class="form-label">WeChat App ID</label>
+                <input type="text" class="form-control" v-model="distributionConfig.wechat_app_id" placeholder="Your WeChat App ID" />
+                <small class="text-muted">WeChat Official Account App ID</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">WeChat App Secret</label>
+                <input type="password" class="form-control" v-model="distributionConfig.wechat_app_secret" placeholder="Your WeChat App Secret" />
+                <small class="text-muted">WeChat Official Account App Secret</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Toutiao Access Token</label>
+                <input type="password" class="form-control" v-model="distributionConfig.toutiao_access_token" placeholder="Your Toutiao Access Token" />
+                <small class="text-muted">Toutiao (ByteDance) API access token</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">WxPusher App Token</label>
+                <input type="password" class="form-control" v-model="distributionConfig.wxpusher_app_token" placeholder="Your WxPusher App Token" />
+                <small class="text-muted">WxPusher application token</small>
+              </div>
+            </div>
 
-          <!-- 保存按钮 -->
-          <div class="form-actions">
-            <el-button type="primary" @click="saveCategory" :loading="saving">
-              Save Configuration
-            </el-button>
-            <el-button @click="resetCategory">
-              Reset
-            </el-button>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+            <!-- 分析策略配置 -->
+            <div v-if="activeCategory === 'strategies'">
+              <div v-if="strategiesLoading" class="text-center py-4">
+                <div class="spinner-border text-primary"></div>
+              </div>
+              <div v-else>
+                <div v-for="market in strategyMarkets" :key="market" class="mb-4">
+                  <div class="card">
+                    <div class="card-header">
+                      <h4 class="card-title mb-0">{{ market }}</h4>
+                    </div>
+                    <div class="card-body">
+                      <div class="row g-2">
+                        <div
+                          v-for="strategy in allStrategies.filter(s => s.markets.includes(market))"
+                          :key="strategy.id"
+                          class="col-sm-6"
+                        >
+                          <label class="form-check">
+                            <input
+                              type="checkbox"
+                              class="form-check-input"
+                              :value="strategy.id"
+                              v-model="enabledStrategies[market]"
+                            />
+                            <span class="form-check-label">
+                              <strong>{{ strategy.display_name }}</strong>
+                              <br />
+                              <small class="text-muted">{{ strategy.description }}</small>
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <button class="btn btn-primary" @click="saveStrategies" :disabled="saving">
+                  <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
+                  {{ t('config.saveStrategies') }}
+                </button>
+              </div>
+            </div>
 
-    <!-- 恢复配置对话框 -->
-    <el-dialog v-model="restoreDialogVisible" title="Restore Configuration" width="500px">
-      <el-upload
-        class="upload-demo"
-        drag
-        :auto-upload="false"
-        :on-change="handleRestoreFile"
-        accept=".json"
-      >
-        <el-icon class="el-icon--upload"><Upload /></el-icon>
-        <div class="el-upload__text">
-          Drop backup file here or <em>click to upload</em>
+            <!-- 保存按钮（策略页除外，策略有独立按钮） -->
+            <div v-if="activeCategory !== 'strategies'" class="mt-4 pt-3 border-top d-flex gap-2">
+              <button class="btn btn-primary" @click="saveCategory" :disabled="saving">
+                <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
+                {{ t('config.saveCategory') }}
+              </button>
+              <button class="btn btn-secondary" @click="resetCategory">{{ t('common.reset') }}</button>
+            </div>
+          </div>
         </div>
-        <template #tip>
-          <div class="el-upload__tip">
-            Only JSON backup files are supported
+      </div>
+    </div>
+
+    <!-- 恢复配置 Modal -->
+    <div class="modal modal-blur fade" :class="{ show: restoreDialogVisible }" :style="{ display: restoreDialogVisible ? 'block' : 'none' }" tabindex="-1">
+      <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Restore Configuration</h5>
+            <button type="button" class="btn-close" @click="restoreDialogVisible = false"></button>
           </div>
-        </template>
-      </el-upload>
-      <template #footer>
-        <el-button @click="restoreDialogVisible = false">Cancel</el-button>
-        <el-button type="primary" @click="restoreConfig" :disabled="!restoreFile">
-          Restore
-        </el-button>
-      </template>
-    </el-dialog>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Select backup file (.json)</label>
+              <input type="file" class="form-control" accept=".json" @change="handleRestoreFile" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="restoreDialogVisible = false">Cancel</button>
+            <button type="button" class="btn btn-primary" @click="restoreConfig" :disabled="!restoreFile">Restore</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="restoreDialogVisible" class="modal-backdrop fade show"></div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { 
-  Check, RefreshLeft, Download, Upload, Delete, Plus 
-} from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 import api from '../utils/api'
+import { strategyApi } from '../utils/api'
 
-// 分类列表
+const { t } = useI18n()
 const categories = ref([])
 const activeCategory = ref('ai')
 const saving = ref(false)
 const restoreDialogVisible = ref(false)
 const restoreFile = ref(null)
+const starTab = ref('A股')
+const holidayTab = ref('')
+const message = reactive({ text: '', type: 'success' })
+
+// 策略配置相关
+const allStrategies = ref([])
+const enabledStrategies = ref({
+  US_STOCK: [],
+  A_SHARE: [],
+  IPO: [],
+  HOT: []
+})
+const strategyMarkets = ['US_STOCK', 'A_SHARE', 'IPO', 'HOT']
+const strategiesLoading = ref(false)
+
+import { reactive } from 'vue'
+
+const showMsg = (text, type = 'success') => {
+  message.text = text
+  message.type = type
+  setTimeout(() => { message.text = '' }, 3000)
+}
 
 // 配置数据
 const aiConfig = ref({
@@ -513,7 +412,7 @@ const emailConfig = ref({
 })
 
 const appConfig = ref({
-  BASE_URL: 'http://139.224.40.205:8080',
+  BASE_URL: 'http://localhost:8080',
   LOG_LEVEL: 'INFO',
   LOG_ROTATION: '10 MB',
   LOG_RETENTION: '30 days'
@@ -556,65 +455,102 @@ const distributionConfig = ref({
   wxpusher_app_token: ''
 })
 
-// 计算属性
-const currentCategory = computed(() => {
-  return categories.value.find(c => c.id === activeCategory.value)
+const currentCategoryLabel = computed(() => {
+  const cat = categories.value.find(c => c.id === activeCategory.value)
+  return cat?.name || t('config.title')
 })
 
-// 方法
 const fetchCategories = async () => {
   try {
     const data = await api.get('/config/categories')
     categories.value = data.categories
+    // 添加策略分类
+    if (!categories.value.find(c => c.id === 'strategies')) {
+      categories.value.push({ id: 'strategies', name: t('config.strategies'), icon: '🎯' })
+    }
   } catch (error) {
-    console.error('Failed to fetch categories:', error)
-    ElMessage.error('Failed to load configuration categories')
+    // 静默失败，使用默认分类
+    categories.value = [
+      { id: 'ai', name: t('config.ai'), icon: '🤖' },
+      { id: 'datasource', name: t('config.datasource'), icon: '📊' },
+      { id: 'email', name: t('config.email'), icon: '📧' },
+      { id: 'app', name: t('config.app'), icon: '⚙️' },
+      { id: 'star_stocks', name: t('config.star_stocks'), icon: '⭐' },
+      { id: 'thresholds', name: t('config.thresholds'), icon: '📏' },
+      { id: 'scheduler', name: t('config.scheduler'), icon: '⏰' },
+      { id: 'project', name: t('config.project'), icon: '🚀' },
+      { id: 'holidays', name: t('config.holidays'), icon: '📅' },
+      { id: 'distribution', name: t('config.distribution'), icon: '📤' },
+      { id: 'strategies', name: t('config.strategies'), icon: '🎯' }
+    ]
   }
 }
 
 const fetchCategoryConfig = async (category) => {
+  if (category === 'strategies') {
+    await fetchStrategies()
+    return
+  }
   try {
     const data = await api.get(`/config/category/${category}`)
-    
     switch (category) {
-      case 'ai':
-        aiConfig.value = data
-        break
-      case 'datasource':
-        datasourceConfig.value = data
-        break
-      case 'email':
-        emailConfig.value = data
-        break
-      case 'app':
-        appConfig.value = data
-        break
-      case 'star_stocks':
-        starStocksConfig.value = data
-        break
-      case 'thresholds':
-        thresholdsConfig.value = data
-        break
-      case 'scheduler':
-        schedulerConfig.value = data
-        break
-      case 'project':
-        projectConfig.value = data
-        break
+      case 'ai': aiConfig.value = data; break
+      case 'datasource': datasourceConfig.value = data; break
+      case 'email': emailConfig.value = data; break
+      case 'app': appConfig.value = data; break
+      case 'star_stocks': starStocksConfig.value = data; break
+      case 'thresholds': thresholdsConfig.value = data; break
+      case 'scheduler': schedulerConfig.value = data; break
+      case 'project': projectConfig.value = data; break
       case 'holidays':
         holidaysConfig.value = data
-        // 初始化 newHoliday
         Object.keys(data).forEach(year => {
           newHoliday.value[year] = ''
         })
+        if (Object.keys(data).length > 0) {
+          holidayTab.value = Object.keys(data)[0]
+        }
         break
-      case 'distribution':
-        distributionConfig.value = data
-        break
+      case 'distribution': distributionConfig.value = data; break
     }
   } catch (error) {
     console.error(`Failed to fetch ${category} config:`, error)
-    ElMessage.error(`Failed to load ${category} configuration`)
+  }
+}
+
+const fetchStrategies = async () => {
+  strategiesLoading.value = true
+  try {
+    const res = await strategyApi.list()
+    allStrategies.value = res.strategies || []
+
+    // 获取各市场已启用的策略
+    for (const market of strategyMarkets) {
+      try {
+        const enabled = await strategyApi.getEnabled(market)
+        enabledStrategies.value[market] = enabled.enabled_strategy_ids || []
+      } catch {
+        enabledStrategies.value[market] = []
+      }
+    }
+  } catch (error) {
+    console.error('Failed to fetch strategies:', error)
+  } finally {
+    strategiesLoading.value = false
+  }
+}
+
+const saveStrategies = async () => {
+  saving.value = true
+  try {
+    for (const market of strategyMarkets) {
+      await strategyApi.setEnabled(market, enabledStrategies.value[market])
+    }
+    showMsg(t('config.strategiesSaved'))
+  } catch (error) {
+    showMsg('Failed to save strategies', 'error')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -628,43 +564,21 @@ const saveCategory = async () => {
   try {
     let configData
     switch (activeCategory.value) {
-      case 'ai':
-        configData = aiConfig.value
-        break
-      case 'datasource':
-        configData = datasourceConfig.value
-        break
-      case 'email':
-        configData = emailConfig.value
-        break
-      case 'app':
-        configData = appConfig.value
-        break
-      case 'star_stocks':
-        configData = starStocksConfig.value
-        break
-      case 'thresholds':
-        configData = thresholdsConfig.value
-        break
-      case 'scheduler':
-        configData = schedulerConfig.value
-        break
-      case 'project':
-        configData = projectConfig.value
-        break
-      case 'holidays':
-        configData = holidaysConfig.value
-        break
-      case 'distribution':
-        configData = distributionConfig.value
-        break
+      case 'ai': configData = aiConfig.value; break
+      case 'datasource': configData = datasourceConfig.value; break
+      case 'email': configData = emailConfig.value; break
+      case 'app': configData = appConfig.value; break
+      case 'star_stocks': configData = starStocksConfig.value; break
+      case 'thresholds': configData = thresholdsConfig.value; break
+      case 'scheduler': configData = schedulerConfig.value; break
+      case 'project': configData = projectConfig.value; break
+      case 'holidays': configData = holidaysConfig.value; break
+      case 'distribution': configData = distributionConfig.value; break
     }
-    
     await api.put(`/config/category/${activeCategory.value}`, configData)
-    ElMessage.success('Configuration saved successfully')
+    showMsg('Configuration saved successfully')
   } catch (error) {
-    console.error('Failed to save config:', error)
-    ElMessage.error('Failed to save configuration')
+    showMsg('Failed to save configuration', 'error')
   } finally {
     saving.value = false
   }
@@ -672,7 +586,6 @@ const saveCategory = async () => {
 
 const resetCategory = () => {
   fetchCategoryConfig(activeCategory.value)
-  ElMessage.info('Configuration reset')
 }
 
 const saveAll = async () => {
@@ -690,34 +603,19 @@ const saveAll = async () => {
       holidays: holidaysConfig.value,
       distribution: distributionConfig.value
     }
-    
     await api.put('/config/batch', { configs: allConfig })
-    ElMessage.success('All configurations saved successfully')
+    showMsg('All configurations saved successfully')
   } catch (error) {
-    console.error('Failed to save all config:', error)
-    ElMessage.error('Failed to save all configurations')
+    showMsg('Failed to save all configurations', 'error')
   } finally {
     saving.value = false
   }
 }
 
-const resetAll = () => {
-  ElMessageBox.confirm(
-    'Are you sure you want to reset all configurations to default?',
-    'Confirm Reset',
-    { type: 'warning' }
-  ).then(() => {
-    fetchCategoryConfig(activeCategory.value)
-    ElMessage.info('All configurations reset')
-  }).catch(() => {})
-}
-
 const backupConfig = async () => {
   try {
     const response = await api.get('/config/backup')
-    const { backup_data, backup_file } = response.data
-    
-    // 下载备份文件
+    const { backup_data } = response
     const blob = new Blob([JSON.stringify(backup_data, null, 2)], { type: 'application/json' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -725,11 +623,9 @@ const backupConfig = async () => {
     a.download = `config_backup_${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     window.URL.revokeObjectURL(url)
-    
-    ElMessage.success('Configuration backup downloaded')
+    showMsg('Configuration backup downloaded')
   } catch (error) {
-    console.error('Failed to backup config:', error)
-    ElMessage.error('Failed to backup configuration')
+    showMsg('Failed to backup configuration', 'error')
   }
 }
 
@@ -737,56 +633,51 @@ const showRestoreDialog = () => {
   restoreDialogVisible.value = true
 }
 
-const handleRestoreFile = (file) => {
-  restoreFile.value = file.raw
+const handleRestoreFile = (e) => {
+  restoreFile.value = e.target.files[0] || null
 }
 
 const restoreConfig = async () => {
   if (!restoreFile.value) return
-  
   try {
     const reader = new FileReader()
     reader.onload = async (e) => {
       try {
         const backupData = JSON.parse(e.target.result)
         await api.post('/config/restore', backupData)
-        ElMessage.success('Configuration restored successfully')
+        showMsg('Configuration restored successfully')
         restoreDialogVisible.value = false
-        
-        // 重新加载所有配置
         Object.keys(backupData).forEach(category => {
-          if (category !== 'holidays') {
-            fetchCategoryConfig(category)
-          }
+          fetchCategoryConfig(category)
         })
       } catch (error) {
-        console.error('Failed to restore config:', error)
-        ElMessage.error('Failed to restore configuration')
+        showMsg('Failed to restore configuration', 'error')
       }
     }
     reader.readAsText(restoreFile.value)
   } catch (error) {
-    console.error('Failed to read backup file:', error)
-    ElMessage.error('Failed to read backup file')
+    showMsg('Failed to read backup file', 'error')
   }
 }
 
 const testEmail = async () => {
   try {
     const response = await api.post('/config/test/email')
-    if (response.data.success) {
-      ElMessage.success('Test email sent successfully')
+    if (response.success) {
+      showMsg('Test email sent successfully')
     } else {
-      ElMessage.error(response.data.message)
+      showMsg(response.message, 'error')
     }
   } catch (error) {
-    console.error('Failed to test email:', error)
-    ElMessage.error('Failed to test email configuration')
+    showMsg('Failed to test email configuration', 'error')
   }
 }
 
 // 明星股操作
 const addStock = (market) => {
+  if (!starStocksConfig.value[market]) {
+    starStocksConfig.value[market] = []
+  }
   starStocksConfig.value[market].push({ code: '', name: '' })
 }
 
@@ -807,99 +698,16 @@ const removeHoliday = (year, index) => {
 }
 
 const addYear = () => {
-  const year = new Date().getFullYear() + 1
+  const year = String(new Date().getFullYear() + 1)
   if (!holidaysConfig.value[year]) {
     holidaysConfig.value[year] = []
     newHoliday.value[year] = ''
+    holidayTab.value = year
   }
 }
 
-// 初始化
 onMounted(() => {
   fetchCategories()
   fetchCategoryConfig('ai')
 })
 </script>
-
-<style scoped>
-.config-container {
-  padding: 20px;
-}
-
-.header-card {
-  margin-bottom: 20px;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.description {
-  color: #909399;
-  margin: 0;
-}
-
-.category-card {
-  height: calc(100vh - 300px);
-}
-
-.category-card .el-menu {
-  border-right: none;
-}
-
-.config-card {
-  min-height: calc(100vh - 300px);
-}
-
-.config-header {
-  margin-bottom: 20px;
-}
-
-.config-header h3 {
-  margin: 0 0 8px 0;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.config-header p {
-  margin: 0;
-  color: #909399;
-  font-size: 14px;
-}
-
-.config-form {
-  max-width: 600px;
-}
-
-.form-tip {
-  color: #909399;
-  font-size: 12px;
-  margin-top: 4px;
-}
-
-.form-actions {
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid #eee;
-}
-
-.stock-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.holiday-list {
-  max-height: 300px;
-  overflow-y: auto;
-}
-</style>

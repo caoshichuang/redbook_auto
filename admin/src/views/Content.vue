@@ -1,79 +1,167 @@
 <template>
-  <div class="content-page">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>内容管理</span>
-          <el-space>
-            <el-select v-model="filter.market" placeholder="市场" clearable style="width: 120px">
-              <el-option label="美股" value="美股" />
-              <el-option label="A股" value="A股" />
-              <el-option label="港股" value="港股" />
-            </el-select>
-            <el-button @click="loadContent">刷新</el-button>
-          </el-space>
+  <div>
+    <div class="page-header d-print-none">
+      <div class="row align-items-center">
+        <div class="col">
+          <h2 class="page-title">{{ t('content.title') }}</h2>
         </div>
-      </template>
-      
-      <el-table :data="contents" v-loading="loading">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="market" label="市场" width="80" />
-        <el-table-column prop="content_type" label="类型" width="100" />
-        <el-table-column prop="title" label="标题" show-overflow-tooltip />
-        <el-table-column prop="created_at" label="生成时间" width="180" />
-        <el-table-column label="操作" width="150">
-          <template #default="{ row }">
-            <el-button size="small" @click="showDetail(row)">查看</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- 内容详情对话框 -->
-    <el-dialog v-model="detailDialogVisible" title="内容详情" width="800px">
-      <div v-if="currentContent">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="ID">{{ currentContent.id }}</el-descriptions-item>
-          <el-descriptions-item label="市场">{{ currentContent.market }}</el-descriptions-item>
-          <el-descriptions-item label="类型">{{ currentContent.content_type }}</el-descriptions-item>
-          <el-descriptions-item label="生成时间">{{ currentContent.created_at }}</el-descriptions-item>
-        </el-descriptions>
-        
-        <h4 style="margin: 16px 0 8px">标题</h4>
-        <p>{{ currentContent.title }}</p>
-        
-        <h4 style="margin: 16px 0 8px">内容</h4>
-        <el-input
-          v-model="currentContent.content"
-          type="textarea"
-          :rows="15"
-          readonly
-        />
-        
-        <h4 style="margin: 16px 0 8px">标签</h4>
-        <p>{{ currentContent.tags }}</p>
+        <div class="col-auto ms-auto d-flex gap-2">
+          <select class="form-select" v-model="filter.market" style="width: 140px;" @change="loadContent">
+            <option value="">{{ t('content.allMarkets') }}</option>
+            <option value="美股">美股</option>
+            <option value="A股">A股</option>
+            <option value="港股">港股</option>
+          </select>
+          <button class="btn btn-secondary" @click="loadContent">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24"
+              stroke-width="2" stroke="currentColor" fill="none">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 .49-3.35" />
+            </svg>
+            {{ t('common.refresh') }}
+          </button>
+        </div>
       </div>
-      <template #footer>
-        <el-button @click="copyContent">复制内容</el-button>
-        <el-button @click="detailDialogVisible = false">关闭</el-button>
-      </template>
-    </el-dialog>
+    </div>
+
+    <!-- 消息提示 -->
+    <div v-if="message.text" class="alert mb-3" :class="message.type === 'success' ? 'alert-success' : 'alert-danger'">
+      {{ message.text }}
+    </div>
+
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>{{ t('content.market') }}</th>
+              <th>{{ t('content.type') }}</th>
+              <th>{{ t('content.contentTitle') }}</th>
+              <th>{{ t('common.createdAt') }}</th>
+              <th>{{ t('common.actions') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loading">
+              <td colspan="6" class="text-center py-4">
+                <div class="spinner-border spinner-border-sm text-primary"></div>
+              </td>
+            </tr>
+            <tr v-else-if="contents.length === 0">
+              <td colspan="6" class="text-center text-muted py-4">暂无内容</td>
+            </tr>
+            <tr v-for="item in contents" :key="item.id">
+              <td class="text-muted">{{ item.id }}</td>
+              <td>
+                <span class="badge bg-blue-lt">{{ item.market }}</span>
+              </td>
+              <td class="text-muted">{{ item.content_type }}</td>
+              <td>
+                <div class="text-truncate" style="max-width: 300px;" :title="item.title">{{ item.title }}</div>
+              </td>
+              <td class="text-muted">
+                <small>{{ item.created_at }}</small>
+              </td>
+              <td>
+                <div class="btn-list flex-nowrap">
+                  <button class="btn btn-sm btn-ghost-secondary" @click="showDetail(item)">
+                    {{ t('content.viewDetail') }}
+                  </button>
+                  <button class="btn btn-sm btn-ghost-danger" @click="handleDelete(item)">
+                    {{ t('common.delete') }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 内容详情 Modal -->
+    <div class="modal modal-blur fade" :class="{ show: detailDialogVisible }" :style="{ display: detailDialogVisible ? 'block' : 'none' }" tabindex="-1" role="dialog">
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">{{ t('content.detail') }}</h5>
+            <button type="button" class="btn-close" @click="detailDialogVisible = false"></button>
+          </div>
+          <div class="modal-body" v-if="currentContent">
+            <div class="row g-3 mb-3">
+              <div class="col-sm-6">
+                <div class="datagrid-item">
+                  <div class="datagrid-title">ID</div>
+                  <div class="datagrid-content">{{ currentContent.id }}</div>
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="datagrid-item">
+                  <div class="datagrid-title">{{ t('content.market') }}</div>
+                  <div class="datagrid-content">{{ currentContent.market }}</div>
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="datagrid-item">
+                  <div class="datagrid-title">{{ t('content.type') }}</div>
+                  <div class="datagrid-content">{{ currentContent.content_type }}</div>
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="datagrid-item">
+                  <div class="datagrid-title">{{ t('common.createdAt') }}</div>
+                  <div class="datagrid-content">{{ currentContent.created_at }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">{{ t('content.contentTitle') }}</label>
+              <div class="form-control bg-light">{{ currentContent.title }}</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">{{ t('content.contentText') }}</label>
+              <textarea class="form-control" :value="currentContent.content" rows="12" readonly style="font-family: monospace; font-size: 0.85rem;"></textarea>
+            </div>
+
+            <div v-if="currentContent.tags" class="mb-3">
+              <label class="form-label fw-bold">{{ t('content.tags') }}</label>
+              <div class="form-control bg-light">{{ currentContent.tags }}</div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary me-auto" @click="copyContent">
+              {{ t('content.copyContent') }}
+            </button>
+            <button type="button" class="btn btn-secondary" @click="detailDialogVisible = false">{{ t('common.close') }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="detailDialogVisible" class="modal-backdrop fade show"></div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { contentApi } from '../utils/api'
 
+const { t } = useI18n()
 const contents = ref([])
 const loading = ref(false)
 const detailDialogVisible = ref(false)
 const currentContent = ref(null)
-const filter = reactive({
-  market: ''
-})
+const filter = reactive({ market: '' })
+const message = reactive({ text: '', type: 'success' })
+
+const showMsg = (text, type = 'success') => {
+  message.text = text
+  message.type = type
+  setTimeout(() => { message.text = '' }, 3000)
+}
 
 const loadContent = async () => {
   loading.value = true
@@ -82,7 +170,7 @@ const loadContent = async () => {
     if (filter.market) params.market = filter.market
     contents.value = await contentApi.list(params)
   } catch (error) {
-    ElMessage.error('加载失败')
+    showMsg('加载失败', 'error')
   } finally {
     loading.value = false
   }
@@ -94,30 +182,20 @@ const showDetail = (row) => {
 }
 
 const handleDelete = async (row) => {
+  if (!confirm('确定删除此内容？')) return
   try {
-    await ElMessageBox.confirm('确定删除此内容？', '提示')
     await contentApi.delete(row.id)
-    ElMessage.success('删除成功')
+    showMsg(t('common.success'))
     loadContent()
   } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.detail || '删除失败')
-    }
+    showMsg(error.response?.data?.detail || t('common.error'), 'error')
   }
 }
 
 const copyContent = () => {
   navigator.clipboard.writeText(currentContent.value.content)
-  ElMessage.success('已复制到剪贴板')
+  showMsg(t('content.copied'))
 }
 
 onMounted(loadContent)
 </script>
-
-<style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-</style>

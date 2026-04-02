@@ -33,6 +33,10 @@ class TradingStrategy:
     core_rules: List[int] = field(default_factory=list)
     required_tools: List[str] = field(default_factory=list)
     source_file: str = ""
+    # 适用市场：US_STOCK / A_SHARE / IPO / HOT，默认全市场
+    markets: List[str] = field(
+        default_factory=lambda: ["US_STOCK", "A_SHARE", "IPO", "HOT"]
+    )
 
     def to_prompt_section(self) -> str:
         """生成可注入到 Prompt 的策略说明段"""
@@ -119,6 +123,7 @@ class StrategyLoader:
                 core_rules=data.get("core_rules", []),
                 required_tools=data.get("required_tools", []),
                 source_file=str(yaml_file),
+                markets=data.get("markets", ["US_STOCK", "A_SHARE", "IPO", "HOT"]),
             )
             logger.debug(f"加载策略: {strategy.name} ({yaml_file.name})")
             return strategy
@@ -243,3 +248,7 @@ class SkillManager:
 
 # 全局策略管理器实例
 skill_manager = SkillManager()
+
+# 策略注册表：策略 id → TradingStrategy 对象，供 API 层查询
+# 此字典在模块加载时由 skill_manager 填充，后续可通过 skill_manager.reload() 热更新
+STRATEGY_REGISTRY: Dict[str, TradingStrategy] = skill_manager.all_strategies

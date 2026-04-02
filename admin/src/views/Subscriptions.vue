@@ -1,125 +1,153 @@
 <template>
-  <div class="subscriptions-container">
-    <el-card class="header-card">
-      <template #header>
-        <div class="card-header">
-          <span>🔔 Subscription Management</span>
-          <el-button type="primary" @click="showAddDialog">
-            <el-icon><Plus /></el-icon>
-            Add Subscription
-          </el-button>
+  <div>
+    <div class="page-header d-print-none">
+      <div class="row align-items-center">
+        <div class="col">
+          <h2 class="page-title">{{ t('subscriptions.title') }}</h2>
         </div>
-      </template>
-    </el-card>
+        <div class="col-auto ms-auto">
+          <button class="btn btn-primary" @click="showAddDialog">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24"
+              stroke-width="2" stroke="currentColor" fill="none">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            {{ t('subscriptions.addSubscription') }}
+          </button>
+        </div>
+      </div>
+    </div>
 
-    <el-table :data="subscriptions" style="width: 100%; margin-top: 20px;">
-      <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="stock_code" label="Code" width="120" />
-      <el-table-column prop="stock_name" label="Name" width="150" />
-      <el-table-column prop="market" label="Market" width="100" />
-      <el-table-column label="Rules" min-width="200">
-        <template #default="scope">
-          <el-tag 
-            v-for="rule in parseRules(scope.row.rules)" 
-            :key="rule.type"
-            style="margin-right: 8px;"
-          >
-            {{ rule.type }}: {{ rule.threshold }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="Status" width="100">
-        <template #default="scope">
-          <el-tag :type="scope.row.is_active ? 'success' : 'info'">
-            {{ scope.row.is_active ? 'Active' : 'Inactive' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="created_at" label="Created" width="180" />
-      <el-table-column label="Actions" width="200" fixed="right">
-        <template #default="scope">
-          <el-button 
-            type="primary" 
-            size="small" 
-            @click="editSubscription(scope.row)"
-          >
-            Edit
-          </el-button>
-          <el-button 
-            type="danger" 
-            size="small" 
-            @click="deleteSubscription(scope.row)"
-          >
-            Delete
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <!-- 消息提示 -->
+    <div v-if="message.text" class="alert mb-3" :class="message.type === 'success' ? 'alert-success' : 'alert-danger'">
+      {{ message.text }}
+    </div>
 
-    <!-- Add/Edit Dialog -->
-    <el-dialog 
-      v-model="dialogVisible" 
-      :title="isEditing ? 'Edit Subscription' : 'Add Subscription'" 
-      width="500px"
-    >
-      <el-form :model="form" label-width="100px">
-        <el-form-item label="Stock Code">
-          <el-input v-model="form.stock_code" placeholder="e.g., 600519" />
-        </el-form-item>
-        <el-form-item label="Stock Name">
-          <el-input v-model="form.stock_name" placeholder="e.g., 贵州茅台" />
-        </el-form-item>
-        <el-form-item label="Market">
-          <el-select v-model="form.market" placeholder="Select market">
-            <el-option label="A股" value="A股" />
-            <el-option label="港股" value="港股" />
-            <el-option label="美股" value="美股" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Alert Rules">
-          <div v-for="(rule, index) in form.rules" :key="index" style="margin-bottom: 10px;">
-            <el-row :gutter="10">
-              <el-col :span="10">
-                <el-select v-model="rule.type" placeholder="Type">
-                  <el-option label="Price Change %" value="change" />
-                  <el-option label="Announcement" value="announce" />
-                  <el-option label="Earnings" value="earning" />
-                  <el-option label="Dividend" value="dividend" />
-                </el-select>
-              </el-col>
-              <el-col :span="10">
-                <el-input 
-                  v-model="rule.threshold" 
-                  placeholder="Threshold" 
-                  :disabled="rule.type !== 'change'"
-                />
-              </el-col>
-              <el-col :span="4">
-                <el-button type="danger" @click="removeRule(index)">-</el-button>
-              </el-col>
-            </el-row>
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>{{ t('subscriptions.stockCode') }}</th>
+              <th>{{ t('subscriptions.stockName') }}</th>
+              <th>{{ t('subscriptions.market') }}</th>
+              <th>{{ t('subscriptions.rules') }}</th>
+              <th>{{ t('common.status') }}</th>
+              <th>{{ t('common.createdAt') }}</th>
+              <th>{{ t('common.actions') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="subscriptions.length === 0">
+              <td colspan="8" class="text-center text-muted py-4">暂无订阅</td>
+            </tr>
+            <tr v-for="sub in subscriptions" :key="sub.id">
+              <td class="text-muted">{{ sub.id }}</td>
+              <td><code>{{ sub.stock_code }}</code></td>
+              <td>{{ sub.stock_name }}</td>
+              <td>
+                <span class="badge bg-blue-lt">{{ sub.market }}</span>
+              </td>
+              <td>
+                <div class="d-flex flex-wrap gap-1">
+                  <span
+                    v-for="rule in parseRules(sub.rules)"
+                    :key="rule.type"
+                    class="badge bg-secondary-lt"
+                  >
+                    {{ rule.type }}: {{ rule.threshold }}
+                  </span>
+                </div>
+              </td>
+              <td>
+                <span class="badge" :class="sub.is_active ? 'bg-success-lt text-success' : 'bg-secondary-lt'">
+                  {{ sub.is_active ? t('subscriptions.active') : t('subscriptions.inactive') }}
+                </span>
+              </td>
+              <td class="text-muted"><small>{{ sub.created_at }}</small></td>
+              <td>
+                <div class="btn-list flex-nowrap">
+                  <button class="btn btn-sm btn-ghost-secondary" @click="editSubscription(sub)">{{ t('common.edit') }}</button>
+                  <button class="btn btn-sm btn-ghost-danger" @click="deleteSubscription(sub)">{{ t('common.delete') }}</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 添加/编辑 Modal -->
+    <div class="modal modal-blur fade" :class="{ show: dialogVisible }" :style="{ display: dialogVisible ? 'block' : 'none' }" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">{{ isEditing ? t('subscriptions.editSubscription') : t('subscriptions.addSubscription') }}</h5>
+            <button type="button" class="btn-close" @click="dialogVisible = false"></button>
           </div>
-          <el-button type="primary" @click="addRule">+ Add Rule</el-button>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="dialogVisible = false">Cancel</el-button>
-        <el-button type="primary" @click="saveSubscription">Save</el-button>
-      </template>
-    </el-dialog>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">{{ t('subscriptions.stockCode') }}</label>
+              <input type="text" class="form-control" v-model="form.stock_code" placeholder="e.g., 600519" />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">{{ t('subscriptions.stockName') }}</label>
+              <input type="text" class="form-control" v-model="form.stock_name" placeholder="e.g., 贵州茅台" />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">{{ t('subscriptions.market') }}</label>
+              <select class="form-select" v-model="form.market">
+                <option value="A股">A股</option>
+                <option value="港股">港股</option>
+                <option value="美股">美股</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">{{ t('subscriptions.alertRules') }}</label>
+              <div v-for="(rule, index) in form.rules" :key="index" class="d-flex gap-2 mb-2">
+                <select class="form-select" v-model="rule.type" style="flex: 1;">
+                  <option value="change">Price Change %</option>
+                  <option value="announce">Announcement</option>
+                  <option value="earning">Earnings</option>
+                  <option value="dividend">Dividend</option>
+                </select>
+                <input
+                  type="text"
+                  class="form-control"
+                  v-model="rule.threshold"
+                  placeholder="Threshold"
+                  :disabled="rule.type !== 'change'"
+                  style="flex: 1;"
+                />
+                <button class="btn btn-ghost-danger btn-sm" @click="removeRule(index)">✕</button>
+              </div>
+              <button class="btn btn-sm btn-secondary" @click="addRule">+ {{ t('subscriptions.addRule') }}</button>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-link link-secondary me-auto" @click="dialogVisible = false">{{ t('common.cancel') }}</button>
+            <button type="button" class="btn btn-primary" @click="saveSubscription">{{ t('common.save') }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="dialogVisible" class="modal-backdrop fade show"></div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { ref, reactive, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '../utils/api'
 
+const { t } = useI18n()
 const subscriptions = ref([])
 const dialogVisible = ref(false)
 const isEditing = ref(false)
 const editingId = ref(null)
+const message = reactive({ text: '', type: 'success' })
 
 const form = ref({
   stock_code: '',
@@ -128,10 +156,16 @@ const form = ref({
   rules: [{ type: 'change', threshold: '5' }]
 })
 
+const showMsg = (text, type = 'success') => {
+  message.text = text
+  message.type = type
+  setTimeout(() => { message.text = '' }, 3000)
+}
+
 const parseRules = (rulesJson) => {
   if (!rulesJson) return []
   try {
-    return JSON.parse(rulesJson)
+    return typeof rulesJson === 'string' ? JSON.parse(rulesJson) : rulesJson
   } catch {
     return []
   }
@@ -139,11 +173,9 @@ const parseRules = (rulesJson) => {
 
 const fetchSubscriptions = async () => {
   try {
-    const data = await api.get('/subscriptions/')
-    subscriptions.value = data
+    subscriptions.value = await api.get('/subscriptions/')
   } catch (error) {
-    console.error('Failed to fetch subscriptions:', error)
-    ElMessage.error('Failed to load subscriptions')
+    showMsg('Failed to load subscriptions', 'error')
   }
 }
 
@@ -175,21 +207,13 @@ const editSubscription = (row) => {
 }
 
 const deleteSubscription = async (row) => {
+  if (!confirm(`Are you sure you want to delete ${row.stock_name}?`)) return
   try {
-    await ElMessageBox.confirm(
-      `Are you sure you want to delete ${row.stock_name}?`,
-      'Confirm',
-      { type: 'warning' }
-    )
-    
     await api.delete(`/subscriptions/${row.id}`)
-    ElMessage.success('Subscription deleted')
+    showMsg('Subscription deleted')
     fetchSubscriptions()
   } catch (error) {
-    if (error !== 'cancel') {
-      console.error('Failed to delete subscription:', error)
-      ElMessage.error('Failed to delete subscription')
-    }
+    showMsg('Failed to delete subscription', 'error')
   }
 }
 
@@ -207,42 +231,19 @@ const saveSubscription = async () => {
       ...form.value,
       rules: JSON.stringify(form.value.rules)
     }
-    
     if (isEditing.value) {
       await api.put(`/subscriptions/${editingId.value}`, data)
-      ElMessage.success('Subscription updated')
+      showMsg('Subscription updated')
     } else {
       await api.post('/subscriptions/', data)
-      ElMessage.success('Subscription created')
+      showMsg('Subscription created')
     }
-    
     dialogVisible.value = false
     fetchSubscriptions()
   } catch (error) {
-    console.error('Failed to save subscription:', error)
-    ElMessage.error('Failed to save subscription')
+    showMsg('Failed to save subscription', 'error')
   }
 }
 
-onMounted(() => {
-  fetchSubscriptions()
-})
+onMounted(fetchSubscriptions)
 </script>
-
-<style scoped>
-.subscriptions-container {
-  padding: 20px;
-}
-
-.header-card {
-  margin-bottom: 20px;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 18px;
-  font-weight: 600;
-}
-</style>

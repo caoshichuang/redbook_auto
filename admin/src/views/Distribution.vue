@@ -1,159 +1,170 @@
 <template>
-  <div class="distribution-container">
-    <el-card class="header-card">
-      <template #header>
-        <div class="card-header">
-          <span>📤 Distribution Management</span>
-        </div>
-      </template>
-      <p class="description">
-        Distribute content to multiple platforms: Xiaohongshu, WeChat Official Account, and Toutiao.
-      </p>
-    </el-card>
-
-    <el-table :data="contents" style="width: 100%; margin-top: 20px;">
-      <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="market" label="Market" width="120" />
-      <el-table-column prop="content_type" label="Type" width="120" />
-      <el-table-column prop="title" label="Title" min-width="200" show-overflow-tooltip />
-      <el-table-column prop="created_at" label="Created" width="180" />
-      <el-table-column label="Status" width="120">
-        <template #default="scope">
-          <el-tag :type="getStatusType(scope.row.status)">
-            {{ scope.row.status }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="Actions" width="300" fixed="right">
-        <template #default="scope">
-          <el-button 
-            type="primary" 
-            size="small" 
-            @click="distributeToXiaohongshu(scope.row)"
-          >
-            Xiaohongshu
-          </el-button>
-          <el-button 
-            type="success" 
-            size="small" 
-            @click="distributeToWechat(scope.row)"
-          >
-            WeChat
-          </el-button>
-          <el-button 
-            type="warning" 
-            size="small" 
-            @click="distributeToToutiao(scope.row)"
-          >
-            Toutiao
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- Xiaohongshu Dialog -->
-    <el-dialog v-model="xiaohongshuDialogVisible" title="Xiaohongshu Distribution" width="600px">
-      <div v-if="xiaohongshuData">
-        <h4>Title (max 20 chars)</h4>
-        <el-input v-model="xiaohongshuData.formatted_content.title" readonly />
-        
-        <h4 style="margin-top: 16px;">Content</h4>
-        <el-input 
-          v-model="xiaohongshuData.formatted_content.full_content" 
-          type="textarea" 
-          :rows="6" 
-          readonly 
-        />
-        
-        <h4 style="margin-top: 16px;">Instructions</h4>
-        <el-input 
-          v-model="xiaohongshuData.instructions" 
-          type="textarea" 
-          :rows="10" 
-          readonly 
-        />
-        
-        <div v-if="xiaohongshuData.warnings && xiaohongshuData.warnings.length > 0">
-          <h4 style="margin-top: 16px;">Warnings</h4>
-          <el-alert 
-            v-for="(warning, index) in xiaohongshuData.warnings" 
-            :key="index"
-            :title="warning" 
-            type="warning" 
-            show-icon 
-            style="margin-bottom: 8px;"
-          />
+  <div>
+    <div class="page-header d-print-none">
+      <div class="row align-items-center">
+        <div class="col">
+          <h2 class="page-title">{{ t('distribution.title') }}</h2>
+          <p class="text-muted mt-1">{{ t('distribution.description') }}</p>
         </div>
       </div>
-      <template #footer>
-        <el-button @click="xiaohongshuDialogVisible = false">Close</el-button>
-        <el-button type="primary" @click="copyXiaohongshuContent">Copy Content</el-button>
-      </template>
-    </el-dialog>
+    </div>
 
-    <!-- WeChat Dialog -->
-    <el-dialog v-model="wechatDialogVisible" title="WeChat Distribution" width="600px">
-      <div v-if="wechatData">
-        <el-alert 
-          :title="wechatData.message" 
-          :type="wechatData.success ? 'success' : 'error'" 
-          show-icon 
-        />
-        
-        <div v-if="wechatData.success && wechatData.data">
-          <h4 style="margin-top: 16px;">Status</h4>
-          <el-tag :type="wechatData.data.status === 'publishing' ? 'warning' : 'success'">
-            {{ wechatData.data.status }}
-          </el-tag>
-          
-          <div v-if="wechatData.data.status === 'draft'">
-            <p style="margin-top: 16px;">
-              Draft has been created in WeChat Official Account backend. 
-              Please log in to publish manually.
-            </p>
+    <!-- 消息提示 -->
+    <div v-if="message.text" class="alert mb-3" :class="message.type === 'success' ? 'alert-success' : 'alert-danger'">
+      {{ message.text }}
+    </div>
+
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Market</th>
+              <th>Type</th>
+              <th>Title</th>
+              <th>Created</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="contents.length === 0">
+              <td colspan="7" class="text-center text-muted py-4">暂无内容</td>
+            </tr>
+            <tr v-for="item in contents" :key="item.id">
+              <td class="text-muted">{{ item.id }}</td>
+              <td>
+                <span class="badge bg-blue-lt">{{ item.market }}</span>
+              </td>
+              <td class="text-muted">{{ item.content_type }}</td>
+              <td>
+                <div class="text-truncate" style="max-width: 250px;" :title="item.title">{{ item.title }}</div>
+              </td>
+              <td class="text-muted"><small>{{ item.created_at }}</small></td>
+              <td>
+                <span class="badge" :class="getStatusBadge(item.status)">{{ item.status }}</span>
+              </td>
+              <td>
+                <div class="btn-list flex-nowrap">
+                  <button class="btn btn-sm btn-ghost-pink" @click="distributeToXiaohongshu(item)">
+                    {{ t('distribution.xiaohongshu') }}
+                  </button>
+                  <button class="btn btn-sm btn-ghost-success" @click="distributeToWechat(item)">
+                    {{ t('distribution.wechat') }}
+                  </button>
+                  <button class="btn btn-sm btn-ghost-warning" @click="distributeToToutiao(item)">
+                    {{ t('distribution.toutiao') }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 小红书 Modal -->
+    <div class="modal modal-blur fade" :class="{ show: xiaohongshuDialogVisible }" :style="{ display: xiaohongshuDialogVisible ? 'block' : 'none' }" tabindex="-1">
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Xiaohongshu Distribution</h5>
+            <button type="button" class="btn-close" @click="xiaohongshuDialogVisible = false"></button>
+          </div>
+          <div class="modal-body" v-if="xiaohongshuData">
+            <div class="mb-3">
+              <label class="form-label fw-bold">Title (max 20 chars)</label>
+              <input type="text" class="form-control" :value="xiaohongshuData.formatted_content?.title" readonly />
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">Content</label>
+              <textarea class="form-control" :value="xiaohongshuData.formatted_content?.full_content" rows="6" readonly></textarea>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">{{ t('distribution.instructions') }}</label>
+              <textarea class="form-control" :value="xiaohongshuData.instructions" rows="10" readonly></textarea>
+            </div>
+            <div v-if="xiaohongshuData.warnings?.length > 0" class="mb-3">
+              <label class="form-label fw-bold">{{ t('distribution.warnings') }}</label>
+              <div v-for="(warning, index) in xiaohongshuData.warnings" :key="index" class="alert alert-warning py-2 mb-1">
+                {{ warning }}
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary me-auto" @click="copyXiaohongshuContent">
+              {{ t('distribution.copyContent') }}
+            </button>
+            <button type="button" class="btn btn-secondary" @click="xiaohongshuDialogVisible = false">Close</button>
           </div>
         </div>
       </div>
-      <template #footer>
-        <el-button @click="wechatDialogVisible = false">Close</el-button>
-      </template>
-    </el-dialog>
+    </div>
+    <div v-if="xiaohongshuDialogVisible" class="modal-backdrop fade show"></div>
 
-    <!-- Toutiao Dialog -->
-    <el-dialog v-model="toutiaoDialogVisible" title="Toutiao Distribution" width="600px">
-      <div v-if="toutiaoData">
-        <el-alert 
-          :title="toutiaoData.message" 
-          :type="toutiaoData.success ? 'success' : 'error'" 
-          show-icon 
-        />
-        
-        <div v-if="toutiaoData.success && toutiaoData.data">
-          <h4 style="margin-top: 16px;">Status</h4>
-          <el-tag :type="toutiaoData.data.status === 'published' ? 'success' : 'warning'">
-            {{ toutiaoData.data.status }}
-          </el-tag>
-          
-          <div v-if="toutiaoData.data.status === 'draft'">
-            <p style="margin-top: 16px;">
-              Article has been created. 
-              Please log in to Toutiao backend to publish manually.
-            </p>
+    <!-- WeChat Modal -->
+    <div class="modal modal-blur fade" :class="{ show: wechatDialogVisible }" :style="{ display: wechatDialogVisible ? 'block' : 'none' }" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">WeChat Distribution</h5>
+            <button type="button" class="btn-close" @click="wechatDialogVisible = false"></button>
+          </div>
+          <div class="modal-body" v-if="wechatData">
+            <div class="alert" :class="wechatData.success ? 'alert-success' : 'alert-danger'">
+              {{ wechatData.message }}
+            </div>
+            <div v-if="wechatData.success && wechatData.data">
+              <div class="mb-2">Status: <span class="badge bg-blue-lt">{{ wechatData.data.status }}</span></div>
+              <div v-if="wechatData.data.status === 'draft'" class="text-muted small">
+                Draft has been created. Please log in to publish manually.
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="wechatDialogVisible = false">Close</button>
           </div>
         </div>
       </div>
-      <template #footer>
-        <el-button @click="toutiaoDialogVisible = false">Close</el-button>
-      </template>
-    </el-dialog>
+    </div>
+    <div v-if="wechatDialogVisible" class="modal-backdrop fade show"></div>
+
+    <!-- Toutiao Modal -->
+    <div class="modal modal-blur fade" :class="{ show: toutiaoDialogVisible }" :style="{ display: toutiaoDialogVisible ? 'block' : 'none' }" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Toutiao Distribution</h5>
+            <button type="button" class="btn-close" @click="toutiaoDialogVisible = false"></button>
+          </div>
+          <div class="modal-body" v-if="toutiaoData">
+            <div class="alert" :class="toutiaoData.success ? 'alert-success' : 'alert-danger'">
+              {{ toutiaoData.message }}
+            </div>
+            <div v-if="toutiaoData.success && toutiaoData.data">
+              <div class="mb-2">Status: <span class="badge bg-blue-lt">{{ toutiaoData.data.status }}</span></div>
+              <div v-if="toutiaoData.data.status === 'draft'" class="text-muted small">
+                Article has been created. Please log in to publish manually.
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="toutiaoDialogVisible = false">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="toutiaoDialogVisible" class="modal-backdrop fade show"></div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, reactive, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '../utils/api'
 
+const { t } = useI18n()
 const contents = ref([])
 const xiaohongshuDialogVisible = ref(false)
 const wechatDialogVisible = ref(false)
@@ -161,24 +172,29 @@ const toutiaoDialogVisible = ref(false)
 const xiaohongshuData = ref(null)
 const wechatData = ref(null)
 const toutiaoData = ref(null)
+const message = reactive({ text: '', type: 'success' })
 
-const getStatusType = (status) => {
-  const types = {
-    generated: 'info',
-    sent: 'success',
-    published: 'success',
-    failed: 'danger',
+const showMsg = (text, type = 'success') => {
+  message.text = text
+  message.type = type
+  setTimeout(() => { message.text = '' }, 3000)
+}
+
+const getStatusBadge = (status) => {
+  const map = {
+    generated: 'bg-blue-lt',
+    sent: 'bg-success-lt text-success',
+    published: 'bg-success-lt text-success',
+    failed: 'bg-danger-lt text-danger'
   }
-  return types[status] || 'info'
+  return map[status] || 'bg-secondary-lt'
 }
 
 const fetchContents = async () => {
   try {
-    const data = await api.get('/content/')
-    contents.value = data
+    contents.value = await api.get('/content/')
   } catch (error) {
-    console.error('Failed to fetch contents:', error)
-    ElMessage.error('Failed to load contents')
+    showMsg('Failed to load contents', 'error')
   }
 }
 
@@ -188,19 +204,16 @@ const distributeToXiaohongshu = async (content) => {
     xiaohongshuData.value = data.data
     xiaohongshuDialogVisible.value = true
   } catch (error) {
-    console.error('Failed to distribute to Xiaohongshu:', error)
-    ElMessage.error('Failed to distribute to Xiaohongshu')
+    showMsg('Failed to distribute to Xiaohongshu', 'error')
   }
 }
 
 const distributeToWechat = async (content) => {
   try {
-    const data = await api.post(`/distribution/wechat/${content.id}`)
-    wechatData.value = data
+    wechatData.value = await api.post(`/distribution/wechat/${content.id}`)
     wechatDialogVisible.value = true
   } catch (error) {
-    console.error('Failed to distribute to WeChat:', error)
-    ElMessage.error('Failed to distribute to WeChat')
+    showMsg('Failed to distribute to WeChat', 'error')
   }
 }
 
@@ -210,51 +223,18 @@ const distributeToToutiao = async (content) => {
     toutiaoData.value = response.data
     toutiaoDialogVisible.value = true
   } catch (error) {
-    console.error('Failed to distribute to Toutiao:', error)
-    ElMessage.error('Failed to distribute to Toutiao')
+    showMsg('Failed to distribute to Toutiao', 'error')
   }
 }
 
 const copyXiaohongshuContent = async () => {
   try {
     await navigator.clipboard.writeText(xiaohongshuData.value.formatted_content.full_content)
-    ElMessage.success('Content copied to clipboard!')
+    showMsg('Content copied to clipboard!')
   } catch (error) {
-    ElMessage.error('Failed to copy content')
+    showMsg('Failed to copy content', 'error')
   }
 }
 
-onMounted(() => {
-  fetchContents()
-})
+onMounted(fetchContents)
 </script>
-
-<style scoped>
-.distribution-container {
-  padding: 20px;
-}
-
-.header-card {
-  margin-bottom: 20px;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.description {
-  color: #909399;
-  margin: 0;
-}
-
-h4 {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-</style>

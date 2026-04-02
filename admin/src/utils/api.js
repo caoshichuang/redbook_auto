@@ -64,7 +64,8 @@ export const contentApi = {
   triggerAShare: () => api.post('/content/trigger/a-share'),
   triggerIPO: () => api.post('/content/trigger/ipo'),
   triggerHot: () => api.post('/content/trigger/hot'),
-  stats: () => api.get('/content/stats/summary')
+  stats: () => api.get('/content/stats/summary'),
+  getProgress: (taskId) => api.get(`/content/progress/${taskId}`)
 }
 
 // 配置API
@@ -83,6 +84,13 @@ export const logsApi = {
   getErrorLog: (lines) => api.get('/logs/error', { params: { lines } }),
   getSystemStatus: () => api.get('/logs/system'),
   getJobs: () => api.get('/logs/jobs')
+}
+
+// 策略配置 API
+export const strategyApi = {
+  list: (market) => api.get('/config/strategies', { params: market ? { market } : {} }),
+  getEnabled: (market) => api.get(`/config/strategies/${market}/enabled`),
+  setEnabled: (market, strategyIds) => api.put(`/config/strategies/${market}/enabled`, strategyIds)
 }
 
 export default api

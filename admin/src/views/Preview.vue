@@ -3,7 +3,10 @@
     <div class="header">
       <div class="logo">⛵ FinanceSail</div>
     </div>
-    
+
+    <!-- Toast 提示 -->
+    <div v-if="toast.show" class="toast" :class="toast.type">{{ toast.message }}</div>
+
     <div class="content-wrapper">
       <div class="title-section">
         <h1 class="title">{{ content.title }}</h1>
@@ -16,22 +19,19 @@
       <div class="images-section" v-if="content.image_urls && content.image_urls.length > 0">
         <h2>📊 Images</h2>
         <div class="images-grid">
-          <div 
-            v-for="(url, index) in content.image_urls" 
-            :key="index" 
+          <div
+            v-for="(url, index) in content.image_urls"
+            :key="index"
             class="image-item"
             @click="viewImage(index)"
           >
             <img :src="url" :alt="`Image ${index + 1}`" />
             <div class="image-overlay">
-              <el-button 
-                type="primary" 
-                size="small" 
-                circle 
+              <button
+                class="btn-download"
                 @click.stop="downloadImage(url, index)"
-              >
-                <el-icon><Download /></el-icon>
-              </el-button>
+                title="下载图片"
+              >⬇</button>
             </div>
           </div>
         </div>
@@ -54,39 +54,28 @@
       </div>
 
       <div class="actions">
-        <el-button type="primary" @click="copyTitle">
-          <el-icon><Document /></el-icon>
-          Copy Title
-        </el-button>
-        <el-button type="success" @click="copyContent">
-          <el-icon><Document /></el-icon>
-          Copy Content
-        </el-button>
-        <el-button type="warning" @click="copyTags">
-          <el-icon><PriceTag /></el-icon>
-          Copy Tags
-        </el-button>
-        <el-button type="info" @click="copyAll">
-          <el-icon><CopyDocument /></el-icon>
-          Copy All
-        </el-button>
+        <button class="btn btn-primary" @click="copyTitle">📄 Copy Title</button>
+        <button class="btn btn-success" @click="copyContent">📋 Copy Content</button>
+        <button class="btn btn-warning" @click="copyTags">🏷️ Copy Tags</button>
+        <button class="btn btn-info" @click="copyAll">📑 Copy All</button>
       </div>
     </div>
 
-    <el-image-viewer
-      v-if="showViewer"
-      :url-list="content.image_urls"
-      :initial-index="viewerIndex"
-      @close="showViewer = false"
-    />
+    <!-- 图片预览弹窗 -->
+    <div v-if="showViewer" class="viewer-overlay" @click="showViewer = false">
+      <div class="viewer-content" @click.stop>
+        <button class="viewer-close" @click="showViewer = false">✕</button>
+        <button class="viewer-prev" @click="prevImage" v-if="content.image_urls && content.image_urls.length > 1">‹</button>
+        <img :src="content.image_urls && content.image_urls[viewerIndex]" class="viewer-img" />
+        <button class="viewer-next" @click="nextImage" v-if="content.image_urls && content.image_urls.length > 1">›</button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { Document, PriceTag, CopyDocument, Download } from '@element-plus/icons-vue'
 import axios from 'axios'
 
 const route = useRoute()
@@ -102,6 +91,13 @@ const content = ref({
 })
 const showViewer = ref(false)
 const viewerIndex = ref(0)
+const toast = ref({ show: false, message: '', type: 'success' })
+
+// 显示 toast 提示
+const showToast = (message, type = 'success') => {
+  toast.value = { show: true, message, type }
+  setTimeout(() => { toast.value.show = false }, 2500)
+}
 
 const parseTags = (tags) => {
   if (!tags) return []
@@ -113,26 +109,28 @@ const viewImage = (index) => {
   showViewer.value = true
 }
 
-const copyToClipboard = async (text) => {
-  try {
-    await navigator.clipboard.writeText(text)
-    ElMessage.success('Copied to clipboard!')
-  } catch (err) {
-    ElMessage.error('Failed to copy')
+const prevImage = () => {
+  if (viewerIndex.value > 0) viewerIndex.value--
+}
+
+const nextImage = () => {
+  if (content.value.image_urls && viewerIndex.value < content.value.image_urls.length - 1) {
+    viewerIndex.value++
   }
 }
 
-const copyTitle = () => {
-  copyToClipboard(content.value.title)
+const copyToClipboard = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    showToast('Copied to clipboard!')
+  } catch {
+    showToast('Failed to copy', 'error')
+  }
 }
 
-const copyContent = () => {
-  copyToClipboard(content.value.content)
-}
-
-const copyTags = () => {
-  copyToClipboard(content.value.tags)
-}
+const copyTitle = () => copyToClipboard(content.value.title)
+const copyContent = () => copyToClipboard(content.value.content)
+const copyTags = () => copyToClipboard(content.value.tags)
 
 const copyAll = () => {
   const all = `${content.value.title}\n\n${content.value.content}\n\n${content.value.tags}`
@@ -147,7 +145,7 @@ const downloadImage = (url, index) => {
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
-  ElMessage.success('Download started!')
+  showToast('Download started!')
 }
 
 const fetchContent = async () => {
@@ -156,7 +154,7 @@ const fetchContent = async () => {
     content.value = response.data
   } catch (error) {
     console.error('Failed to fetch content:', error)
-    ElMessage.error('Failed to load content')
+    showToast('Failed to load content', 'error')
   }
 }
 
@@ -171,7 +169,23 @@ onMounted(() => {
   margin: 0 auto;
   padding: 20px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  position: relative;
 }
+
+/* Toast 提示 */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.toast.success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+.toast.error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
 
 .header {
   display: flex;
@@ -185,7 +199,7 @@ onMounted(() => {
 .logo {
   font-size: 24px;
   font-weight: bold;
-  color: #409eff;
+  color: #0d6efd;
 }
 
 .content-wrapper {
@@ -217,7 +231,7 @@ onMounted(() => {
 }
 
 .market {
-  background: #409eff;
+  background: #0d6efd;
   color: #fff;
   padding: 4px 12px;
   border-radius: 4px;
@@ -268,6 +282,22 @@ h2 {
   opacity: 1;
 }
 
+.btn-download {
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-download:hover { background: rgba(0,0,0,0.8); }
+
 .image-item img {
   width: 100%;
   height: 100%;
@@ -298,13 +328,14 @@ h2 {
 }
 
 .tag {
-  background: #ecf5ff;
-  color: #409eff;
+  background: #dbeafe;
+  color: #1d4ed8;
   padding: 6px 12px;
   border-radius: 4px;
   font-size: 14px;
 }
 
+/* 操作按钮 */
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -314,6 +345,80 @@ h2 {
   padding-top: 24px;
   border-top: 1px solid #eee;
 }
+
+.btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+.btn:hover { opacity: 0.85; }
+.btn-primary { background: #0d6efd; color: #fff; }
+.btn-success { background: #198754; color: #fff; }
+.btn-warning { background: #ffc107; color: #212529; }
+.btn-info    { background: #0dcaf0; color: #212529; }
+
+/* 图片预览弹窗 */
+.viewer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewer-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.viewer-img {
+  max-width: 80vw;
+  max-height: 85vh;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.viewer-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: #fff;
+  font-size: 20px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.viewer-prev,
+.viewer-next {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: #fff;
+  font-size: 32px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewer-prev:hover,
+.viewer-next:hover { background: rgba(255,255,255,0.35); }
 
 /* 手机端适配 */
 @media (max-width: 768px) {
@@ -344,7 +449,7 @@ h2 {
     flex-direction: column;
   }
 
-  .actions .el-button {
+  .actions .btn {
     width: 100%;
   }
 }
