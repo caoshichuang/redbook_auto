@@ -62,13 +62,15 @@ jobs:
 
             # 重启 Python 服务
             echo "[2/2] 重启服务..."
-            pkill -f "src.main" || true
+            pkill -f "src.main" 2>/dev/null || true
             sleep 2
             export PATH=$PATH:/home/admin/.local/bin
-            nohup python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8080 > /tmp/finacesail.log 2>&1 &
+            # 用 setsid 让新进程成为独立进程组，避免 ssh 会话退出时发 SIGTERM
+            setsid nohup python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8080 > /tmp/finacesail.log 2>&1 </dev/null &
+            disown
 
             echo "等待服务启动..."
-            sleep 10
+            sleep 15
             echo "========================================="
             echo "FinanceSail 部署完成"
             echo "========================================="
