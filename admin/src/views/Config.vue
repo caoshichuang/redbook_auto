@@ -358,10 +358,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import api from '../utils/api'
-import { strategyApi } from '../utils/api'
+import api, { strategyApi } from '../utils/api'
 
 const { t } = useI18n()
 const categories = ref([])
@@ -383,8 +382,6 @@ const enabledStrategies = ref({
 })
 const strategyMarkets = ['US_STOCK', 'A_SHARE', 'IPO', 'HOT']
 const strategiesLoading = ref(false)
-
-import { reactive } from 'vue'
 
 const showMsg = (text, type = 'success') => {
   message.text = text
