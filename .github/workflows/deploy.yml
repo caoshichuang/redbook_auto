@@ -15,5 +15,5 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_KEY }}
           script: |
-            cd /home/admin/redbook-auto
+            cd /home/admin/FinanceSai
             bash scripts/deploy.sh
