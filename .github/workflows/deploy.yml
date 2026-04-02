@@ -69,11 +69,22 @@ jobs:
           echo "新进程已启动，PID=$NEW_PID"
           REMOTE_SCRIPT
 
-      # 6. 验证服务健康
+      # 6. 验证服务健康（失败则暴露真实原因，CI 也真正报错）
       - name: Verify service health
         run: |
-          echo "等待服务启动（20秒）..."
-          sleep 20
+          echo "等待服务启动（25秒）..."
+          sleep 25
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
-            "ps aux | grep 'uvicorn' | grep -v grep && curl -sf http://localhost:8080/api/health && echo '✅ 健康检查通过' || (echo '⚠️ 服务异常，查看日志:' && tail -20 /tmp/finacesail.log)"
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'HEALTH_SCRIPT'
+          export PATH=$PATH:/home/admin/.local/bin
+          echo "===== 进程检查 ====="
+          ps aux | grep 'uvicorn' | grep -v grep || true
+          echo "===== 端口监听检查 ====="
+          ss -tlnp | grep 8080 || echo "⚠️ 8080 端口未监听"
+          echo "===== 最新日志（末20行）====="
+          tail -20 /tmp/finacesail.log || echo "日志文件不存在"
+          echo "===== HTTP 健康检查 ====="
+          curl -sf http://localhost:8080/api/health
+          echo ""
+          echo "✅ 健康检查通过"
+          HEALTH_SCRIPT
