@@ -8,19 +8,20 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      # 1. 在 Actions runner（GitHub 机房）检出代码
+      # 1. 检出代码
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. 配置 SSH 私钥，用于后续 rsync 和 ssh 命令
+      # 2. 配置 SSH 私钥
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SERVER_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH key 配置完成"
 
-      # 3. rsync 推送代码到服务器（跳过敏感文件、git历史、node_modules）
+      # 3. rsync 推送代码（跳过敏感文件）
       - name: Sync code to server
         run: |
           rsync -avz --delete \
@@ -36,54 +37,43 @@ jobs:
             --exclude='*.pyc' \
             -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
             ./ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/home/admin/FinanceSai/
+          echo "代码同步完成"
 
-      # 4. SSH：构建前端
+      # 4. 构建前端（原生 ssh，无 drone-ssh 中间层）
       - name: Build frontend
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_KEY }}
-          script: |
-            set -e
-            cd /home/admin/FinanceSai/admin
-            npm install --registry=https://registry.npmmirror.com
-            npm run build
-            echo "前端构建完成"
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+            "cd /home/admin/FinanceSai/admin && npm install --registry=https://registry.npmmirror.com && npm run build && echo '前端构建完成'"
 
-      # 5. SSH：重启 Python 服务（独立 session，避免 SIGTERM 影响）
+      # 5. 重启服务（原生 ssh）
       - name: Restart service
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_KEY }}
-          script: |
-            export PATH=$PATH:/home/admin/.local/bin
-            # 杀掉旧进程
-            OLD_PID=$(pgrep -f "uvicorn src.main:app" 2>/dev/null || true)
-            if [ -n "$OLD_PID" ]; then
-              kill $OLD_PID 2>/dev/null || true
-              sleep 3
-            fi
-            # 启动新进程（完全脱离当前 session）
-            cd /home/admin/FinanceSai
-            setsid python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8080 >> /tmp/finacesail.log 2>&1 &
-            disown $!
-            echo "服务启动命令已发出，PID=$!"
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'REMOTE_SCRIPT'
+          export PATH=$PATH:/home/admin/.local/bin
+          # 杀掉旧 uvicorn 进程
+          OLD_PID=$(pgrep -f "uvicorn src.main:app" 2>/dev/null || true)
+          if [ -n "$OLD_PID" ]; then
+            kill $OLD_PID 2>/dev/null || true
+            sleep 3
+            echo "已停止旧进程 PID=$OLD_PID"
+          else
+            echo "无旧进程在运行"
+          fi
+          # 用 nohup + setsid 启动，完全脱离 session
+          cd /home/admin/FinanceSai
+          nohup setsid python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8080 >> /tmp/finacesail.log 2>&1 &
+          NEW_PID=$!
+          disown $NEW_PID
+          echo "新进程已启动，PID=$NEW_PID"
+          REMOTE_SCRIPT
 
-      # 6. SSH：等待服务就绪并验证
+      # 6. 验证服务健康
       - name: Verify service health
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_KEY }}
-          script: |
-            echo "等待服务启动..."
-            sleep 20
-            echo "========================================="
-            echo "FinanceSail 部署完成"
-            echo "========================================="
-            ps aux | grep "uvicorn" | grep -v grep || echo "警告：服务进程未找到"
-            curl -sf http://localhost:8080/api/health && echo "✅ 服务健康检查通过" || echo "⚠️ 服务未响应（检查 /tmp/finacesail.log）"
+        run: |
+          echo "等待服务启动（20秒）..."
+          sleep 20
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+            "ps aux | grep 'uvicorn' | grep -v grep && curl -sf http://localhost:8080/api/health && echo '✅ 健康检查通过' || (echo '⚠️ 服务异常，查看日志:' && tail -20 /tmp/finacesail.log)"
